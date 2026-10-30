@@ -1,4 +1,4 @@
-"""Run a self-checking 6502 test using the linked protocol symbols."""
+"""Assemble and run self-checking 6502 tests in Python using exported symbols."""
 
 import argparse
 from collections import Counter
@@ -6,55 +6,75 @@ from contextlib import redirect_stdout
 from dataclasses import dataclass
 import io
 from pathlib import Path
-import shutil
-import subprocess
 import sys
-import tempfile
 
 import py4hw
 import punxa_6502 as punxa
+from punxa_6502.assembly import AssemblyResult, assemble_file
 
 
 TEST_DIR = Path(__file__).resolve().parent
+# Explicit legacy file loading remains available through prepare_test().
 TEST_FILE = TEST_DIR / "test_data_LDA.bin"
 SYMBOL_FILE = TEST_DIR / "test_data_LDA.lbl"
 PROGRAM_START = 0x0200
 MEMORY_SIZE = 0x10000
+PROTOCOL_SYMBOLS = ("test_case", "final_result", "end")
 # Timing-only 32-case diagnostic measured 5281 clocks; retain finite headroom.
 MAX_CYCLES = 10000
 
 
+def _validate_symbols(symbols, exports):
+    """Require exported, byte-addressed protocol symbols before constructing CPUs."""
+    for name in PROTOCOL_SYMBOLS:
+        if name not in exports or name not in symbols:
+            raise ValueError(f"Missing exported symbol: {name}")
+        if type(symbols[name]) is not int or not 0 <= symbols[name] < MEMORY_SIZE:
+            raise ValueError(f"Symbol outside 6502 memory or not an integer: {name}")
+
+
 def read_symbols(path):
-    """Read the global symbols from ld65's -Ln VICE label file."""
+    """Read an explicitly supplied legacy VICE label file; not used by normal runs."""
     symbols = {}
     for line in Path(path).read_text(encoding="utf-8").splitlines():
         fields = line.split()
         if len(fields) == 3 and fields[0] == "al":
-            symbols[fields[2].removeprefix(".")] = int(fields[1], 16)
-    for name in ("test_case", "final_result", "end"):
-        if name not in symbols:
-            raise ValueError(f"Missing exported symbol: {name}")
-        if not 0 <= symbols[name] < MEMORY_SIZE:
-            raise ValueError(f"Symbol outside 6502 memory: {name}")
+            name = fields[2].removeprefix(".")
+            if name in symbols:
+                raise ValueError(f"Duplicate exported symbol: {name}")
+            symbols[name] = int(fields[1], 16)
+    _validate_symbols(symbols, symbols)
     return symbols
 
 
-def prepare_test(binary=TEST_FILE, label_file=SYMBOL_FILE, *, adapter=None):
-    """Build fresh hardware and load the linked test; default to SingleCycle."""
-    program = Path(binary).read_bytes()
-    symbols = read_symbols(label_file)
-    if not program:
-        raise ValueError(f"Empty test binary: {binary}")
-    program_end = PROGRAM_START + len(program)
+def prepare_program(program: AssemblyResult, *, adapter=None):
+    """Validate in-memory assembly and load it into fresh CPU/64 KiB memory.
+
+    The assembler enforces its CODE layout limits. This loader also validates
+    arbitrary AssemblyResult inputs against simulated memory and protocol slots.
+    Returned symbols are copied so callers cannot mutate the assembly result.
+    """
+    if not isinstance(program, AssemblyResult):
+        raise TypeError("prepare_program requires an AssemblyResult")
+    if not isinstance(program.code, bytes):
+        raise ValueError("Test program must contain machine-code bytes")
+    if not program.code:
+        raise ValueError("Empty test program")
+    origin = program.origin
+    if type(origin) is not int or not 0 <= origin < MEMORY_SIZE:
+        raise ValueError("Program origin outside 6502 memory or not an integer")
+    symbols = dict(program.symbols)
+    _validate_symbols(symbols, program.exports)
+    program_end = origin + len(program.code)
     if program_end > MEMORY_SIZE:
-        raise ValueError("Test binary does not fit in the allocated memory")
+        raise ValueError("Test program does not fit in the allocated memory")
     for name in ("test_case", "final_result"):
-        if PROGRAM_START <= symbols[name] < program_end:
-            raise ValueError(f"Test binary overlaps {name}")
+        if origin <= symbols[name] < program_end:
+            raise ValueError(f"Test program overlaps {name}")
     if symbols["test_case"] == symbols["final_result"]:
         raise ValueError("test_case and final_result overlap")
-    if not PROGRAM_START <= symbols["end"] < program_end:
-        raise ValueError("end is outside the test binary")
+    if not origin <= symbols["end"] < program_end:
+        raise ValueError("end is outside the test program")
 
     hw = py4hw.HWSystem()
     reset = hw.wire("reset")
@@ -66,15 +86,29 @@ def prepare_test(binary=TEST_FILE, label_file=SYMBOL_FILE, *, adapter=None):
         hw, "main_memory", 8, 32, mem_port, mem_base=0
     )
     punxa.MultiplexedBus(hw, "bus", cpu_port, [(mem_port, 0)])
-    cpu = (adapter.create_cpu(hw, cpu_port, reset, irq, nmi, PROGRAM_START)
+    cpu = (adapter.create_cpu(hw, cpu_port, reset, irq, nmi, origin)
            if adapter else punxa.SingleCycle6502(
-               hw, "cpu", cpu_port, reset, irq, nmi, PROGRAM_START))
+               hw, "cpu", cpu_port, reset, irq, nmi, origin))
     memory.reallocArea(0, MEMORY_SIZE, verbose=False)
-    for offset, byte in enumerate(program):
-        memory.writeByte(PROGRAM_START + offset, byte)
+    for offset, byte in enumerate(program.code):
+        memory.writeByte(origin + offset, byte)
     memory.writeByte(symbols["test_case"], 0)
     memory.writeByte(symbols["final_result"], 0)
     return hw, cpu, memory, symbols
+
+
+def prepare_test(binary=TEST_FILE, label_file=SYMBOL_FILE, *, adapter=None):
+    """Compatibility loader for AssemblyResult or explicitly saved .bin/.lbl files.
+
+    No external tools are called. Standard source-file execution uses
+    prepare_program() directly and never requires these legacy files.
+    """
+    if isinstance(binary, AssemblyResult):
+        return prepare_program(binary, adapter=adapter)
+    symbols = read_symbols(label_file)
+    program = AssemblyResult(PROGRAM_START, Path(binary).read_bytes(),
+                             symbols, frozenset(symbols))
+    return prepare_program(program, adapter=adapter)
 
 
 @dataclass(frozen=True)
@@ -195,39 +229,17 @@ class _CPUTrace(io.TextIOBase):
             self.stream.flush()
 
 
-def build_test(source, build_dir, cc65_bin=None):
-    """Adapt ATmega's assemble_program to ca65 + ld65 + linked labels."""
+def build_test(source, build_dir=None, cc65_bin=None):
+    """Return AssemblyResult using the Python assembler, without output files.
+
+    Legacy build_dir and cc65_bin arguments are accepted but ignored. Callers
+    that unpacked two output paths must instead consume the returned result.
+    """
     source = Path(source).resolve()
     if source.suffix.lower() != ".asm" or not source.is_file():
         raise ValueError(f"Not an assembly test file: {source}")
-    paths = {}
-    for name in ("ca65", "ld65"):
-        executable = name + ".exe" if sys.platform == "win32" else name
-        candidate = str(Path(cc65_bin) / executable) if cc65_bin else executable
-        paths[name] = shutil.which(candidate)
-        if paths[name] is None:
-            raise FileNotFoundError(
-                f"{name} not found; add cc65/bin to PATH or use --cc65-bin"
-            )
-    build_dir = Path(build_dir)
-    obj = build_dir / (source.stem + ".o")
-    binary = build_dir / (source.stem + ".bin")
-    labels = build_dir / (source.stem + ".lbl")
-    commands = [
-        [paths["ca65"], "--cpu", "6502", "-I", str(source.parent),
-         "-I", str(TEST_DIR / "isa"), str(source), "-o", str(obj)],
-        [paths["ld65"], "-C", str(TEST_DIR / "isa_test.cfg"),
-         str(obj), "-o", str(binary), "-Ln", str(labels)],
-    ]
-    for command in commands:
-        completed = subprocess.run(command, capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace", timeout=30)
-        if completed.returncode:
-            raise RuntimeError(
-                f"{Path(command[0]).stem} failed: "
-                f"{completed.stderr.strip() or completed.stdout.strip()}"
-            )
-    return binary, labels
+    return assemble_file(source, origin=PROGRAM_START,
+                         include_dirs=(TEST_DIR / "isa",))
 
 
 def resolve_test(value, test_dir=None):
@@ -254,9 +266,8 @@ def run_file_result(source, cc65_bin=None, max_cycles=None, trace=False,
             raise ValueError("max_cycles must be positive")
         source = resolve_test(source, test_dir)
         name = source.name
-        with tempfile.TemporaryDirectory(prefix="punxa6502-isa-") as build_dir:
-            binary, labels = build_test(source, build_dir, cc65_bin)
-            hardware = prepare_test(binary, labels, adapter=adapter)
+        program = build_test(source, cc65_bin=cc65_bin)
+        hardware = prepare_program(program, adapter=adapter)
         with redirect_stdout(output):
             result = execute_test(*hardware, name=name, max_cycles=max_cycles,
                                   adapter=adapter)
@@ -362,13 +373,17 @@ def main(argv=None, *, adapter=None):
     parser.add_argument("--test-dir", type=Path,
                         help="discovery directory (default: isa/ beside this runner)")
     parser.add_argument("--list", action="store_true", help="list selected files only")
-    parser.add_argument("--cc65-bin", type=Path)
+    parser.add_argument("--cc65-bin", type=Path,
+                        help="deprecated compatibility option; ignored (uses Python assembler)")
     parser.add_argument("--max-cycles", type=int,
                         default=adapter.max_cycles if adapter else MAX_CYCLES)
     parser.add_argument("--trace", action="store_true")
     # Match the AVR batch spelling without eval or arbitrary command execution.
     parser.add_argument("-c", choices=["runAllTests()"], help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.cc65_bin is not None:
+        print("warning: --cc65-bin is deprecated and ignored; tests use the Python assembler.",
+              file=sys.stderr)
     if args.max_cycles <= 0:
         parser.error("--max-cycles must be positive")
     batch = args.all or bool(args.category) or args.c is not None

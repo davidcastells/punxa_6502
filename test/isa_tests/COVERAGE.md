@@ -1,6 +1,6 @@
-# ISA Coverage Matrix - after expansion Batch 5
+# ISA Coverage Matrix - after expansion Batch 6
 
-Updated 2026-10-26 from the completed review, Phase A/B3 and Batch 1-5 evidence.
+Updated 2026-10-27 from the completed review, Phase A/B3 and Batch 1-6 evidence.
 Implementation labels/modes are carried forward; no full CPU review was repeated.
 Scope: SingleCycle6502 and documented original NMOS instructions.
 
@@ -9,20 +9,24 @@ still17 target mnemonics. $A9 was already covered, so B3 added no SingleCycle
 target mnemonic/opcode pair. That subset
 checks A/Z on5 cases and actually passes on both models (481/974 clocks);
 this is not full LDA correctness or a new full-suite run.
-See [MultiCycle matrix](MULTICYCLE_COMPATIBILITY.md) and
-[B3 evidence](results/phase_b3_2026-10-22_03/REPORT.md).
+See the [MultiCycle matrix](MULTICYCLE_COMPATIBILITY.md) for compatibility limits.
 
 ## Counting and interpretation
 
 - Opcode/Decode baseline:56 mnemonics /151 opcode-mode pairs.
 - Actual Execute paths, including partial/defective behavior:39 /116.
-- Formal targets: **32/39=82.05%**, in33 files (Batch 4:29/39=74.36%).
-- Observed target pairs including isolated original cases: **101/116=87.07%**
-  (Batch 4:98/116=84.48%). Batch 5 adds three observed target opcodes.
-- Sequential --all reaches **97/116=83.62%**. Four ASL memory forms were
+- Formal targets: **35/39=89.74%**, in36 files (Batch 5:32/39=82.05%).
+- Observed target pairs including retained isolated cases: **107/116=92.24%**
+  (Batch 5:101/116=87.07%). Batch 6 adds six distinct target opcode/mode pairs.
+- Sequential --all reaches **103/116=88.79%**. Four ASL memory forms were
   actually executed only in isolated original case blocks after file failure.
-- No formal target coverage remains for7 Execute mnemonics /15 pairs.
+  Those historical isolated executions were not repeated in Batch 6.
+- No formal target coverage remains for4 Execute mnemonics /9 pairs.
 - Coverage includes meaningful failing checks; it is not CPU correctness.
+
+The denominator is the reviewed Execute-path inventory, including defective paths,
+not the full NMOS opcode table. Helpers and negative controls add no target pairs.
+The second LDA file repeats an existing target, so36 files target35 mnemonics.
 
 Fully implemented means the reviewed RAM functional logic is present, not
 independently verified unless Test Result says so. Partially implemented
@@ -55,11 +59,11 @@ A=Accumulator; imp=Implied; rel=Relative.
 | Compare | CMP | Partially implemented | G8 | [Yes: test_arith_CMP.asm](isa/test_arith_CMP.asm) | G8; C/Z/N, A unchanged, V/D preserved; independent ADC oracle | 10 PASS / 0 FAIL | Indirect boundaries; I preservation; more operand/status combinations |
 | Compare | CPY | Fully implemented | #, zp, abs | [Yes: test_arith_CPY.asm](isa/test_arith_CPY.asm) | three modes; equality/less/greater in each; unsigned C, wrapped N, Z; incoming C ignored; Y/A/X/SP/V/D preserved, I=0; operand unchanged | 12 PASS; full PASS12,6015 clocks | I=1 preservation; exhaustive operand/status combinations |
 | Inc/Dec | INC | Partially implemented | M4 | [Yes: test_arith_INC.asm](isa/test_arith_INC.asm) | M4; memory/guards, N/Z, A/other flags | 4 PASS / 1 FAIL; full FAIL5 | Known FF to00 flags failure; more per-mode boundaries |
-| Inc/Dec | DEC | Partially implemented | M4 | No | - | Not verified | 00 toFF, N normalization and flags |
+| Inc/Dec | DEC | Partially implemented | M4 | [Yes: test_arith_DEC.asm](isa/test_arith_DEC.asm) | M4; fixed memory results and N/Z, A/X/Y/SP/C/V/D preservation, I=0; guards/sentinels, zp,X wrap and abs,X page crossing | 8 sequential PASS; full PASS8,5671 clocks; raw N=-1 in cases3/8 is a separate internal observation | Canonical internal N; underflow in zp/abs; I=1; exhaustive per-mode inputs, full16-bit indexed wrap, RMW timing |
 | Inc/Dec | INX | Partially implemented | imp | [Yes: test_arith_INX.asm](isa/test_arith_INX.asm) | imp; X/N/Z and C/V/D preservation; I=0 | 4 PASS / 2 FAIL; full FAIL5 | Known nonzero-even Z failures; exhaustive inputs/status combinations |
-| Inc/Dec | INY | Partially implemented | imp | No | - | Not verified | Z calculation and 8-bit Y wrap |
+| Inc/Dec | INY | Partially implemented | imp | [Yes: test_arith_INY.asm](isa/test_arith_INY.asm) | 00->01,01->02,7E->7F,7F->80,FE->FF,FF->00; live/saved Y, N/Z, A/X/SP/C/V/D preservation, I=0; guards | Full FAIL2,1007 clocks:1 PASS/1 FAIL/4 NOT_REACHED; retained isolated cases3-6 give aggregate3 PASS/3 FAIL | Confirmed incorrect Z and missing 8-bit Y wrap; assertions after first failure not implied; I=1; exhaustive states |
 | Inc/Dec | DEX | Fully implemented | imp | [Yes: test_arith_DEX.asm](isa/test_arith_DEX.asm) | ordinary/even results, 00->FF,01->00,80->7F,81->80; X/N/Z, A/Y/SP/C/V/D preservation, I=0; memory guards/no target writes | 8 PASS; full PASS8,4489 clocks | I=1; exhaustive inputs/state combinations |
-| Inc/Dec | DEY | Fully implemented | imp | No | - | Not verified | Zero, negative, wrap, N/Z |
+| Inc/Dec | DEY | Fully implemented | imp | [Yes: test_arith_DEY.asm](isa/test_arith_DEY.asm) | 02->01,01->00,00->FF,80->7F,81->80,FF->FE; live/saved Y, N/Z, A/X/SP/C/V/D preservation, I=0; guards | 6 sequential PASS; full PASS6,3480 clocks | I=1; exhaustive input/status combinations; reset/interrupt effects |
 | Logic | AND | Partially implemented | G8 | [Yes: test_logic_AND.asm](isa/test_logic_AND.asm) | G8; A/N/Z and C/V/D preservation | 10 PASS / 0 FAIL | Indirect boundaries; I preservation; further patterns/status combinations |
 | Logic | ORA | Partially implemented | G8 | [Yes: test_logic_ORA.asm](isa/test_logic_ORA.asm) | G8; complementary/zero/all-one/partial patterns; A/N/Z, X/Y/SP/C/V/D preservation, I=0; zp/indexed/indirect boundaries | 12 PASS /3 FAIL; full FAIL13,6030 clocks; 14/15 isolated FAIL | Known shared indirect pointer wrapping; later assertions after failed check; full16-bit wrap; I=1; exhaustive patterns |
 | Shift | ASL | Partially implemented | A + M4 (broken memory write-back) | [Yes: test_bitmap_ASL.asm](isa/test_bitmap_ASL.asm) | A + M4*; values/C/N/Z, memory write-back | 3 PASS / 6 FAIL; full FAIL4 | Known A width/write-back defects; later memory flag assertions not reached |
@@ -81,6 +85,10 @@ A=Accumulator; imp=Implied; rel=Relative.
 * All four ASL memory cases independently FAIL. First assertion checks write-back;
 later A/flags assertions are not reached. Actual wrong A/flags are retained
 as independent target-retirement observations.
+
+DEC remains a formal ISA PASS: all asserted memory bytes and packed status bits
+match fixed expectations. Its noncanonical internal N=-1 in cases3/8 is retained
+as an implementation finding; packed flags do not establish raw N normalization.
 
 ## Defined/decoded standard instructions without dedicated Execute
 
@@ -110,7 +118,7 @@ instructions can also retire, so absence of exceptions does not prove support.
 
 ## Remaining gaps and evidence
 
-Untested Execute targets: DEC, INY, DEY; ROR; JMP; CLD, SED.
+Untested Execute targets: ROR (5 pairs), JMP (2), CLD (1), SED (1).
 Auxiliary usage is not formal target coverage.
 
 Further gaps: Decimal arithmetic; I=1 setup/preservation (SEI/PLP/RTI missing);
@@ -120,14 +128,14 @@ flags remain separate concerns without new executed cases.
 
 Baseline sources: [instruction_decode.py](../../punxa_6502/instruction_decode.py)
 and [singlecycle_processor.py](../../punxa_6502/algorithmic/singlecycle_processor.py).
-Known locations: indirect189-209; ASL271-276; INC329-334; INX335-339;
+Known locations: indirect189-209; ASL271-276; DEC313-318; INC329-334;
+INX335-339; INY340-344;
 PLA487-489; indirect JMP179-188; RTS491-505. The comment questioning NMOS LDY
 $B4 is incorrect; the mapped zp,X form is included. No decoder/CPU fix was made.
 
-[Phase A report](results/phase_a_2026-10-22_01/REPORT.md) and summary.json
-retain actual file/case totals, target opcodes, CPU issues and Phase B readiness.
-Historical LDA independent32-case results remain in results/lda_2026-10-20_02;
-this phase reran full LDA only.
+Historical isolated LDA cases give29 PASS/3 FAIL; later full-suite runs stop
+at case30. Retained observations are distinguished from current sequential
+execution throughout this matrix; no local result directory is needed to read it.
 
 Historical Phase A file results: **12 PASS /5 FAIL /0 TIMEOUT /0 ERROR**, exit1.
 Phase A's new68 cases: **54 PASS /14 FAIL**, including isolated original blocks.
@@ -149,8 +157,8 @@ The unchanged shared MultiCycle LDA Immediate file was rerun: PASS5,974 clocks,
 STX also requires missing zp,Y and SBC has no dispatched Execute path.
 These static blockers are not dynamically executed FAIL/ERROR outcomes.
 
-[Batch 1 evidence](results/expansion_batch1_2026-10-23_01/REPORT.md) includes
-per-case states, bus addresses/data, three negative controls and exact CLI records.
+Batch 1 also checked per-case states, bus addresses/data and three negative
+controls. Those diagnostic executions add no formal target pairs.
 
 ## Batch 2 observed increment
 
@@ -170,8 +178,8 @@ New files are NOT_RUN on MultiCycle. All require missing CLD/PHP/SEC/SED;
 LDY lacks zp/zp,X/abs/abs,X, STY lacks zp/zp,X, and CPY lacks zp/abs dispatch.
 Static presence of LDY#, STY abs and CPY# is not semantic validation or evidence
 that an unchanged complete file is executable. No MultiCycle simulation was run
-in Batch 2. [Batch 2 evidence](results/expansion_batch2_2026-10-26_01/REPORT.md)
-retains per-case outcomes, traces, observed opcodes, negative controls and blockers.
+in Batch 2. Per-case observations and negative controls support the outcomes
+above without adding formal target pairs.
 
 ## Batch 3 observed increment
 
@@ -198,8 +206,8 @@ Coverage95 combines historical85 and ten new pairs, all reached by full files.
 All three are NOT_RUN on MultiCycle: CLD/PHP/SEC/SED helpers lack dispatch.
 ORA has only #/zp target paths; BCC lacks target dispatch; DEX has a path but
 its complete file is blocked. No MultiCycle execution or weakened variants.
-[Batch 3 evidence](results/expansion_batch3_2026-10-26_01/REPORT.md) retains
-actual full/isolated/negative runs, pointer reads, branch paths and coverage basis.
+The full/isolated distinction, pointer reads and branch paths above are the
+coverage basis; negative-control executions add no formal pairs.
 
 ## Batch 4 observed increment
 
@@ -224,8 +232,8 @@ do not create extra pairs. Old isolated failures were not rerun this batch.
 
 MultiCycle has all three target dispatch branches, but required CLD/PHP/SEC/SED
 helpers still lack dispatch. All three unchanged files are NOT_RUN; no MultiCycle
-simulation or weakened variants. [Batch 4 evidence](results/expansion_batch4_2026-10-26_01/REPORT.md)
-retains individual cases/phases, captured-versus-checked controls and exact CLI logs.
+simulation or weakened variants. Captured-versus-checked negative controls
+are diagnostic evidence and add no formal target pairs.
 
 ## Batch 5 observed increment
 
@@ -261,5 +269,29 @@ All three unchanged files are NOT_RUN on MultiCycle. TSX/TXS have dispatch,
 but required PHP/SEC/CLD/SED do not. PHP itself has no dispatch and additionally
 requires missing BCC. Static dispatch presence does not prove full semantics;
 no weakened file or MultiCycle simulation was used.
-[Batch 5 evidence](results/expansion_batch5_2026-10-26_01/REPORT.md) retains
-case results, raw target/stack observations, negative controls and CLI outputs.
+Case results, raw target/stack observations and negative controls support the
+historical Batch 5 baseline above.
+
+## Batch 6 observed increment
+
+INY $C8 and DEY $88 (implied), plus DEC $C6/$D6/$CE/$DE (zp/zp,X/abs/abs,X),
+all actually executed as formal targets. These six distinct pairs raise observed
+coverage from101 to107 and sequential coverage from97 to103. Repeated cases
+and isolated INY cases add no further pairs.
+
+INY's complete file stops at case2:1 PASS/1 FAIL/4 NOT_REACHED. Earlier isolated
+execution of the unchanged cases3-6 gives aggregate3 PASS/3 FAIL. The confirmed
+differences are incorrect Z for nonzero even results and missing 8-bit Y wrap.
+DEY's six and DEC's eight scenarios PASS sequentially. DEC's internal N=-1 in
+cases3/8 is separate from its correct byte write-back and packed status flags;
+it does not change DEC's formal PASS.
+
+Full36-file SingleCycle --all: **29 PASS /7 FAIL /0 TIMEOUT /0 ERROR**, exit1.
+All original33 outcomes/cases/clocks/PCs match Batch 5. The six prior failing
+files remain unchanged; INY adds the seventh. Six temporary negative controls
+detect incorrect value/flag expectations and are excluded from coverage.
+
+No MultiCycle run was performed for Batch 6. The unchanged complete new files
+require helpers recorded as unsupported there, including CLD/PHP/SEC/SED;
+they remain NOT_RUN, with no new MultiCycle correctness claim.
+See [BATCH6_SUMMARY.md](BATCH6_SUMMARY.md) for every new scenario, results and limits.

@@ -114,8 +114,8 @@ Listing exits 0; invalid CLI arguments or selections exit 2.
 
 ## Current verified SingleCycle baseline
 
-As of 2026-10-26: **33 formal files; 27 PASS / 6 FAIL / 0 TIMEOUT / 0 ERROR**.
-The full `--all` command therefore currently exits **1**. The six known failures:
+As of 2026-10-27: **36 formal files; 29 PASS / 7 FAIL / 0 TIMEOUT / 0 ERROR**.
+The full `--all` command therefore currently exits **1**. The seven known failures:
 
 | File | First failing case | Known behavior |
 | --- | --- | --- |
@@ -125,11 +125,14 @@ The full `--all` command therefore currently exits **1**. The six known failures
 | `test_bitmap_ASL.asm` | 4 | Result width / memory write-back defects |
 | `test_data_PLA.asm` | 1 | Missing N/Z updates |
 | `test_logic_ORA.asm` | 13 | Shared zero-page indirect pointer wrapping |
+| `test_arith_INY.asm` | 2 | Incorrect Z update; isolated case 6 also shows missing 8-bit Y wrapping |
 
 Files stop at their first failed assertion; later cases are not implied to pass.
-Formal targets cover **32/39 Execute-path mnemonics** and **101/116 opcode/mode
+Formal targets cover **35/39 Execute-path mnemonics** and **107/116 opcode/mode
 pairs**, including retained isolated-case observations; sequential execution
-reaches 97 pairs. Coverage includes failing checks and does not mean correctness.
+reaches **103/116** pairs. Coverage includes failing checks and does not mean correctness.
+See [BATCH6_SUMMARY.md](BATCH6_SUMMARY.md) for INY/DEY/DEC scenarios and findings.
+DEC's eight scenarios PASS; its raw internal N=-1 observation is recorded separately.
 
 ## MultiCycle compatibility and scope
 
