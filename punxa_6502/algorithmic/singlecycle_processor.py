@@ -33,6 +33,8 @@ class SingleCycle6502(py4hw.Logic):
          self.Z = 0 # zero flag
          self.C = 0 # carry flag
          
+         self.SP = 0
+         
          self.retired = 0
          
          self.symbols = {}
@@ -294,7 +296,7 @@ class SingleCycle6502(py4hw.Logic):
                 print(f'BNE {w:3} \t--> (Z={self.Z})' )
         elif (op == 'CLC'):
             self.C = 0
-            print(f'CLC     \t--> C=0')
+            print('CLC     \t--> C=0')
         elif (op == 'CLD'):
             self.D = 0
             print(f'CLD {ws} \t--> {ms}D={self.D}')            
@@ -532,3 +534,25 @@ class SingleCycle6502(py4hw.Logic):
         self.mem.write.prepare(0)
         self.mem.be.prepare(0)
         yield
+
+    def getRegister(self, r):
+        r = r.upper()
+        if (r == 'PC'):
+            return self.pc 
+        elif (r == 'A'):
+            return self.A
+        elif (r == 'X'):
+            return self.X
+        elif (r == 'Y'):
+            return self.Y
+        elif (r == 'SP'):
+            return self.SP
+        else:
+            raise Exception(f'register {r} not known')
+        
+         # self.N = 0 # negative flag
+         # self.V = 0 # overflow
+         # self.D = 0 # decimal
+         # self.I = 0 # disable interrupts
+         # self.Z = 0 # zero flag
+         # self.C = 0 # carry flag
