@@ -2,13 +2,31 @@
 """
 Created on Thu Jun  5 17:32:10 2025
 
-@author: 2016570
+@author: dcr
 """
 import punxa_6502
 
 _ci_cpu = None
 _ci_mem = None
 
+
+def list_commands():
+    print('punxa interactive commands:')
+    #print('  loadProgram - load a program (elf) in memory')
+    #print('  checkpoint  - save the system state in a file')
+    #print('  restore     - restore the system state from a file')
+    #print('  run         - run the system for a number of clock cycles')
+    print('  step        - run an instruction step')
+    #print('  tbreak      - set a temporal breakpoint (PC address)')
+    #print('  go          - run until the temporal breakpoint is hit')
+    print('  regs        - display the core registers of the processor')
+    #print('  reportCSR   - display the content of CSRs')
+    #print('  console     - display the content of the console')
+    #print('  stack       - display the stack from [current] thread')
+    print('  dump        - dump (hex) the content of data memory locations')
+    
+    
+    
 def dump(address, size=0x100, mem_base=0):
     memory = _ci_mem
     pos = address 
@@ -44,12 +62,12 @@ def step(num=1):
         
 def regs():
     cpu = _ci_cpu
-
-    pc = cpu._wires['q_PC'].get()
-    a = cpu._wires['q_A'].get()
-    x = cpu._wires['q_X'].get()
-    y = cpu._wires['q_Y'].get()
-    sp = cpu._wires['q_SP'].get()
+    
+    pc = cpu.getRegister('PC')
+    a = cpu.getRegister('A')
+    x = cpu.getRegister('X')
+    y = cpu.getRegister('Y')
+    sp = cpu.getRegister('SP')
     
     print(f'PC= {pc:04X}')    
     print(f' A=   {a:02X}')    
