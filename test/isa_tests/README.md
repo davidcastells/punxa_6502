@@ -4,6 +4,11 @@ We implemented some instruction tests in assembler in a similar way that RISC-V 
 
 In punxa_6502 we provide assembler code that we assemble with our own assembler.
 
+## Single cycle algorithmic design
+
+This model is the behavioral model described with the algorithmic py4hw design style, which currently is not synthesizable.
+
+
 To run the tests do
 
 ```
@@ -65,4 +70,73 @@ Test test_mcu_CLD.asm               = OK
 Test test_mcu_SEC.asm               = OK
 Test test_mcu_SED.asm               = OK
 Total: 40 Correct: 31 (77.5 %)
+```
+
+## Multi-cycle structural design
+
+This model is the model that contains a datapath described with the structural py4hw design style.
+The datapath is synthesizable.
+
+
+To run the tests do
+
+```
+python  tb_ISA_tests_Multicycle.py -c "runAllTests()"
+```
+
+***Summary***
+
+<pre>
+test_arith      0.0 %    |░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|
+test_bitmap     0.0 %    |░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|
+test_ctrflow    0.0 %    |░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|
+test_data       6.2 %    |███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|
+test_logic      0.0 %    |░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|
+test_mcu        0.0 %    |░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|
+</pre>
+
+The detailed current output is:
+
+```
+Test test_arith_ADC.asm             = FAILED - op D8 not handled
+Test test_arith_CMP.asm             = FAILED - op D8 not handled
+Test test_arith_CPY.asm             = FAILED - op D8 not handled
+Test test_arith_DEC.asm             = FAILED - op D8 not handled
+Test test_arith_DEX.asm             = FAILED - op D8 not handled
+Test test_arith_DEY.asm             = FAILED - op D8 not handled
+Test test_arith_INC.asm             = FAILED - op D8 not handled
+Test test_arith_INX.asm             = FAILED - op D8 not handled
+Test test_arith_INY.asm             = FAILED - op D8 not handled
+Test test_arith_SBC.asm             = FAILED - op D8 not handled
+Test test_bitmap_ASL.asm            = FAILED - op D8 not handled
+Test test_bitmap_ROR.asm            = FAILED - op D8 not handled
+Test test_ctrflow_BCC.asm           = FAILED - op D8 not handled
+Test test_ctrflow_BEQ.asm           = FAILED - op D8 not handled
+Test test_ctrflow_BNE.asm           = FAILED - op D8 not handled
+Test test_ctrflow_JMP.asm           = FAILED - op D8 not handled
+Test test_ctrflow_JSR.asm           = FAILED - op D8 not handled
+Test test_ctrflow_RTS.asm           = FAILED - op D8 not handled
+Test test_data_LDA.asm              = FAILED - op D8 not handled
+Test test_data_LDA_Immediate.asm    = OK
+Test test_data_LDX.asm              = FAILED - op D8 not handled
+Test test_data_LDY.asm              = FAILED - op D8 not handled
+Test test_data_PHA.asm              = FAILED - op D8 not handled
+Test test_data_PHP.asm              = FAILED - op D8 not handled
+Test test_data_PLA.asm              = FAILED - op D8 not handled
+Test test_data_STA.asm              = FAILED - op D8 not handled
+Test test_data_STX.asm              = FAILED - op D8 not handled
+Test test_data_STY.asm              = FAILED - op D8 not handled
+Test test_data_TAX.asm              = FAILED - op D8 not handled
+Test test_data_TAY.asm              = FAILED - op D8 not handled
+Test test_data_TSX.asm              = FAILED - op D8 not handled
+Test test_data_TXA.asm              = FAILED - op D8 not handled
+Test test_data_TXS.asm              = FAILED - op D8 not handled
+Test test_data_TYA.asm              = FAILED - op D8 not handled
+Test test_logic_AND.asm             = FAILED - op D8 not handled
+Test test_logic_ORA.asm             = FAILED - op D8 not handled
+Test test_mcu_CLC.asm               = FAILED - op D8 not handled
+Test test_mcu_CLD.asm               = FAILED - op F8 not handled
+Test test_mcu_SEC.asm               = FAILED - op D8 not handled
+Test test_mcu_SED.asm               = FAILED - op D8 not handled
+Total: 40 Correct: 1 (2.5 %)
 ```
