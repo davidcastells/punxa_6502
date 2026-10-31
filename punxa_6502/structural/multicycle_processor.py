@@ -369,6 +369,20 @@ class MultiCycle6502(py4hw.Logic):
     def getRetiredInstructions(self):
         return self.children['control'].getRetiredInstructions()
         
+    def getRegister(self, r):
+        r = r.upper()
+        if (r == 'PC'):
+            return self.children['datapath']._wires['q_PC'].get() 
+        elif (r == 'A'):
+            return self.children['datapath']._wires['q_A'].get() 
+        elif (r == 'X'):
+            return self.children['datapath']._wires['q_X'].get() 
+        elif (r == 'Y'):
+            return self.children['datapath']._wires['q_Y'].get() 
+        elif (r == 'SP'):
+            return self.children['datapath']._wires['q_SP'].get() 
+        else:
+            raise Exception(f'register {r} not known')
         
 class ControlUnit6502Behavioral(py4hw.Logic):
     
