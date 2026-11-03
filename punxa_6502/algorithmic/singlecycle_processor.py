@@ -37,9 +37,16 @@ class SingleCycle6502(py4hw.Logic):
          
          self.retired = 0
          
-         self.symbols = {}
+         self.symbols = {} 
          
          self.co = self.run()
+         
+    def loadSymbols(self, symbols):
+         self.symbols = symbols
+         self.inv_symbols = {}
+         for key in symbols.keys():
+             val = symbols[key]
+             self.inv_symbols[val] = key
          
     def clock(self):
         next(self.co)
@@ -81,8 +88,8 @@ class SingleCycle6502(py4hw.Logic):
         print(f'Reset Address: 0x{self.pc:04X}')
         
     def fetch(self):
-        if (self.pc in self.symbols.keys()):
-            print('{}:'.format(self.symbols[self.pc]))
+        if (self.pc in self.inv_symbols.keys()):
+            print('{}:'.format(self.inv_symbols[self.pc]))
             
         self.ins = yield from self.memoryRead(self.pc)
         self.pc += 1
