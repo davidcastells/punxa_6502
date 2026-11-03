@@ -47,6 +47,8 @@ def dump(address, size=0x100, mem_base=0):
 #    memory.write(32*4+0x04, 0x00112e23) # sw      ra,28(sp)
 
 
+MAX_CLOCKS_PER_INSTRUCTION = 100
+
 def step(num=1):
     global hw
     cpu = _ci_cpu
@@ -55,8 +57,13 @@ def step(num=1):
     while (num > 0):
         ret = cpu.getRetiredInstructions()
         
+        clk_cnt = 0
         while (ret == cpu.getRetiredInstructions()):
             sim.clk()        
+            clk_cnt += 1
+            
+            if (clk_cnt > MAX_CLOCKS_PER_INSTRUCTION):
+                raise Exception(f'CPU did not retire an instruction after {MAX_CLOCKS_PER_INSTRUCTION} clocks')
 
         num -= 1
         
@@ -69,9 +76,19 @@ def regs():
     y = cpu.getRegister('Y')
     sp = cpu.getRegister('SP')
     
-    print(f'PC= {pc:04X}')    
-    print(f' A=   {a:02X}')    
-    print(f' X=   {x:02X}')    
-    print(f' Y=   {y:02X}')    
-    print(f'SP=   {sp:02X}')    
+    n = cpu.getRegister('N')
+    o = cpu.getRegister('V')
+    b = cpu.getRegister('B')
+    d = cpu.getRegister('D')
+    i = cpu.getRegister('I')
+    z = cpu.getRegister('Z')
+    c = cpu.getRegister('C')
+    
+    print(f'   PC= {pc:04X}')    
+    print(f'    A= {a:02X}')    
+    print(f'    X= {x:02X}')    
+    print(f'    Y= {y:02X}')    
+    print(f'   SP= {sp:02X}')   
+    print( '     = NV-BDIZC')   
+    print(f'Flags= {n:01X}{o:01X}1{b:01X}{d:01X}{i:01X}{z:01X}{c:01X}')       
     
