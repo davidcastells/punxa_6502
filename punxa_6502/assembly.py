@@ -198,14 +198,8 @@ def _listing_entry(record: _Instruction | _Data | _Fill,
     return ListingEntry(record.address, data, record.directive.upper(), mode, record.source)
 
 
-def assemble_program(
-    source: str,
-    origin: int = 0x0200,
-    max_size: int = 0x0E00,
-    include_dirs: Sequence[str | Path] = (),
-    *,
-    source_name: str = "<string>",
-) -> AssemblyResult:
+def assemble_program(source: str, origin: int = 0x0200, max_size: int = 0x0E00, include_dirs: Sequence[str | Path] = (),
+    *, source_name: str = "<string>") -> AssemblyResult:
     """Assemble source into bytes/symbols without creating any output files.
 
     Includes resolve relative to ``source_name``, then ``include_dirs``.
@@ -351,12 +345,8 @@ def assemble_program(
                           symbols, frozenset(exports), listing)
 
 
-def assemble_file(
-    path: str | Path,
-    origin: int = 0x0200,
-    max_size: int = 0x0E00,
-    include_dirs: Sequence[str | Path] = (),
-) -> AssemblyResult:
+def assemble_file(path: str | Path, origin: int = 0x0200, max_size: int = 0x0E00,
+    include_dirs: Sequence[str | Path] = ()) -> AssemblyResult:
     """Read a UTF-8 source file and return its in-memory assembly result."""
     path = Path(path).resolve()
     try:
