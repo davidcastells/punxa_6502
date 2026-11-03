@@ -38,7 +38,7 @@ ex_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'isa')
 PROGRAM_START = 0x0200
 MEMORY_SIZE = 0x10000
 step_limit = 10000          # maximum instructions per test
-MAX_CLOCKS_PER_INSTRUCTION = 100
+
 
 # Leave empty to run every test_<group>_*.asm found in isa/.
 # Or restrict it, e.g. ['test_data', 'test_arith'].
@@ -54,9 +54,9 @@ symbols = None
 # --------------------------------------------------------------------------
 # Building the system
 # --------------------------------------------------------------------------
-def prepareTest(file):
+def prepareTest(file, useWaveforms=False):
     """Assemble isa/<file>, build the CPU + 64 KiB memory and load the program."""
-    global hw, cpu, mem, symbols
+    global hw, cpu, mem, symbols, wvf
 
     program = assemble_file(Path(ex_dir) / file, origin=PROGRAM_START,
                             include_dirs=(Path(ex_dir),))
@@ -82,6 +82,7 @@ def prepareTest(file):
     punxa.MultiplexedBus(hw, 'bus', cpu_port, [(mem_port, 0)])
 
     cpu = punxa.MultiCycle6502(hw, 'cpu', cpu_port, reset, irq, nmi, PROGRAM_START)
+    cpu.loadSymbols(symbols)
     
     # Load program and clear the result slots
     mem.reallocArea(0, MEMORY_SIZE, verbose=False)
@@ -89,6 +90,21 @@ def prepareTest(file):
         mem.writeByte(PROGRAM_START + offset, byte)
     mem.writeByte(symbols['test_case'], 0)
     mem.writeByte(symbols['final_result'], 0)
+
+    if (useWaveforms):
+        watch = py4hw.debug.getInterfaceWires(cpu_port)
+        datapath = cpu.children['datapath']
+        watch.extend( py4hw.debug.getPorts(datapath.children['alu']))
+        watch.append( datapath._wires['q_PC_lo'])
+        watch.append( datapath._wires['q_PC_hi'])
+        watch.append( datapath._wires['q_PC'])
+        watch.append( datapath._wires['q_SP'])
+        
+        watch.append( cpu.status['q_C'])
+        watch.append( cpu.status['q_V'])
+        #watch.extend( py4hw.debug.getPorts(datapath.children['select_b']))
+        
+        wvf = py4hw.Waveform(hw, 'wvf', watch)
 
     import punxa_6502.interactive_commands as ci
     ci._ci_hw = hw
@@ -153,16 +169,21 @@ def computeAllTests():
              and (not selected_prefixes
                   or any(name.startswith(p) for p in selected_prefixes))]
 
+    import time
     ret = {}
     for f in files:
         print('Run test', f, end=' ')
+        t0 = time.time()
         try:
             runTest(f)
-            print('PASSED')
+            print('PASSED', end=' ')
             ret[f] = 'OK'
         except Exception as e:
-            print('FAILED')
+            print('FAILED', end=' ')
             ret[f] = ('FAILED', e)
+        
+        tf = time.time()
+        print(f'({tf-t0:0.2f} seconds)')
 
     return ret
 
