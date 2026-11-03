@@ -58,8 +58,7 @@ def prepareTest(file):
     """Assemble isa/<file>, build the CPU + 64 KiB memory and load the program."""
     global hw, cpu, mem, symbols
 
-    program = assemble_file(Path(ex_dir) / file, origin=PROGRAM_START,
-                            include_dirs=(Path(ex_dir),))
+    program = assemble_file(Path(ex_dir) / file, origin=PROGRAM_START, include_dirs=(Path(ex_dir),))
     symbols = dict(program.symbols)
 
     for name in ('test_case', 'final_result', 'end'):
@@ -82,6 +81,7 @@ def prepareTest(file):
     punxa.MultiplexedBus(hw, 'bus', cpu_port, [(mem_port, 0)])
 
     cpu = punxa.SingleCycle6502(hw, 'cpu', cpu_port, reset, irq, nmi, PROGRAM_START)
+    cpu.loadSymbols(symbols)
 
     # Load program and clear the result slots
     mem.reallocArea(0, MEMORY_SIZE, verbose=False)
