@@ -149,6 +149,7 @@ class SingleCycle6502(py4hw.Logic):
         ms = ''
 
         isStore = (op in ['STA', 'STX', 'STY'])
+        isJump = (op == 'JMP')
                    
         if (addressing == punxa_6502.ADDRESSING_IMPLIED):
             w = 0
@@ -168,7 +169,7 @@ class SingleCycle6502(py4hw.Logic):
         elif (addressing == punxa_6502.ADDRESSING_ABSOLUTE):
             add = v[0] | v[1] << 8
             ws = f'{add:04X}  '
-            if not(isStore):
+            if not(isStore) and not(isJump):
                 w = yield from self.memoryRead(add)
                 ms = f'[{add:04X}]={w:02X} '
         elif (addressing == punxa_6502.ADDRESSING_ABSOLUTEX):
@@ -199,9 +200,9 @@ class SingleCycle6502(py4hw.Logic):
             add = v[0]
             ws = f'(${add:02X},X)'
             add0 = add
-            add += self.X
+            add = (add + self.X) & 0xFF
             ptr_lo = yield from self.memoryRead(add)
-            ptr_hi = yield from self.memoryRead(add+1)
+            ptr_hi = yield from self.memoryRead((add+1) & 0xFF)
             ptr = ptr_hi << 8 | ptr_lo
             w = yield from self.memoryRead(ptr)
             add = ptr
@@ -211,10 +212,10 @@ class SingleCycle6502(py4hw.Logic):
             ws = f'(${add:02X}),Y'
             add0 = add
             ptr_lo = yield from self.memoryRead(add)
-            ptr_hi = yield from self.memoryRead(add+1)
+            ptr_hi = yield from self.memoryRead((add+1) & 0xFF)
             ptr = ptr_hi << 8 | ptr_lo
 
-            add = ptr + self.Y
+            add = (ptr + self.Y) & 0xFFFF
             w = yield from self.memoryRead(add)
             ms = f'[{add0:04X}]={ptr:04X}->[{ptr:04X}+{self.Y:02X}]={w:02X} '
             
@@ -278,11 +279,20 @@ class SingleCycle6502(py4hw.Logic):
             self.Z = (self.A == 0) & 1
             print(f'AND {ws} \t--> {ms}A={self.A:02X} N={self.N} Z={self.Z}')
         elif (op == 'ASL'):
-            self.C = self.A >> 7
-            self.A = self.A << 1
-            self.N = self.A >> 7
-            self.Z = (self.A == 0) & 1
-            print(f'ASL {ws} \t--> {ms}A={self.A:02X} N={self.N} Z={self.Z}')
+            if (addressing == punxa_6502.ADDRESSING_ACCUMULATOR):
+                self.C = (self.A >> 7) & 1
+                self.A = (self.A << 1) & 0xFF
+                self.N = self.A >> 7
+                self.Z = (self.A == 0) & 1
+                print(f'ASL {ws} \t--> A={self.A:02X} C={self.C} N={self.N} Z={self.Z}')
+            else:
+                # Memory addressing modes (ZeroPage, Absolute, ZeroPage,X, Absolute,X)
+                self.C = (w >> 7) & 1
+                R = (w << 1) & 0xFF
+                self.N = (R >> 7) & 1
+                self.Z = (R == 0) & 1
+                yield from self.memoryWrite(add, R)
+                print(f'ASL {ws} \t--> {ms} [{add:04X}]={R:02X} C={self.C} N={self.N} Z={self.Z}')
         elif (op == 'BCC'):
             if (self.C == 0):
                 self.pc += w
@@ -336,24 +346,44 @@ class SingleCycle6502(py4hw.Logic):
             self.Z = (self.Y == 0) & 1
             print(f'DEY \t\t--> Y={self.Y:02X} N={self.N} Z={self.Z}')            
         elif (op == 'INC'):
-            R = w + 1;
-            self.N = R >> 7
+            R = (w + 1) & 0xFF;
+            self.N = (R >> 7) & 1
             self.Z = (R == 0) & 1
             yield from self.memoryWrite(add, R)
             print(f'INC \t\t--> {ms} [{add:04X}]={R:02X} N={self.N} Z={self.Z}')
         elif (op == 'INX'):
             self.X = (self.X + 1) & 0xFF
-            self.N = self.X >> 7
-            self.Z = (self.X & 1) ^ 1
+            self.N = (self.X >> 7) & 1
+            self.Z = (self.X == 0) & 1
             print(f'INX \t\t--> X={self.X:02X} N={self.N} Z={self.Z}')
         elif (op == 'INY'):
-            self.Y += 1
-            self.N = self.Y >> 7
-            self.Z = (self.Y & 1) ^ 1
+            self.Y = (self.Y + 1) & 0xFF
+            self.N = (self.Y >> 7) & 1
+            self.Z = (self.Y == 0) & 1
             print(f'INY \t\t--> Y={self.Y:02X} N={self.N} Z={self.Z}')            
         elif (op == 'JMP'):
-            self.pc = add
-            print(f'JMP {ws}\t--> pc={self.pc:04X}' )
+            if (addressing == punxa_6502.ADDRESSING_ABSOLUTE):
+                self.pc = add
+                print(f'JMP {ws}\t--> pc={self.pc:04X}')
+            elif (addressing == punxa_6502.ADDRESSING_INDIRECT):
+                # add currently holds the vector address from v[0] | v[1] << 8
+                # (or if using zero-page indirect depending on assembler, let's read properly)
+                ptr_addr = v[0] | v[1] << 8
+                ptr_lo = yield from self.memoryRead(ptr_addr)
+                
+                # 6502 bug simulation: indirect vector page boundary wrap around
+                if (ptr_addr & 0x00FF) == 0x00FF:
+                    hi_addr = ptr_addr & 0xFF00
+                else:
+                    hi_addr = ptr_addr + 1
+                    
+                ptr_hi = yield from self.memoryRead(hi_addr)
+                self.pc = (ptr_hi << 8) | ptr_lo
+                print(f'JMP (${ptr_addr:04X}) \t--> pc={self.pc:04X}')
+            else:
+                self.pc = add
+                print(f'JMP {ws}\t--> pc={self.pc:04X}')
+                
         elif (op == 'JSR'):
             ra = self.pc -1
             rah = ra >> 8
@@ -384,11 +414,19 @@ class SingleCycle6502(py4hw.Logic):
             print(f'ORA {ws} \t--> {ms}A={self.A:02X} N={self.N} Z={self.Z}')
         elif (op == 'ROR'):
             pC = self.C
-            self.C = w & 1
-            self.A = pC << 7 | w >>1 
-            self.N = pC
-            self.Z = (self.A == 0) & 1
-            print(f'ROR {ws} \t--> {ms}A={self.A:02X} N={self.N} Z={self.Z}')
+            if (addressing == punxa_6502.ADDRESSING_ACCUMULATOR):
+                self.C = self.A & 1
+                self.A = (pC << 7) | (self.A >> 1)
+                self.N = (self.A >> 7) & 1
+                self.Z = (self.A == 0) & 1
+                print(f'ROR {ws} \t--> A={self.A:02X} C={self.C} N={self.N} Z={self.Z}')
+            else:
+                self.C = w & 1
+                R = (pC << 7) | (w >> 1)
+                self.N = (R >> 7) & 1
+                self.Z = (R == 0) & 1
+                yield from self.memoryWrite(add, R)
+                print(f'ROR {ws} \t--> {ms} [{add:04X}]={R:02X} C={self.C} N={self.N} Z={self.Z}')
         elif (op == 'SBC'):
             sA = (self.A >> 7) & 1
             sM = (w >> 7) & 1
