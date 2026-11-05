@@ -533,7 +533,9 @@ class SingleCycle6502(py4hw.Logic):
             
         elif (op == 'PLA'):
             self.A, spa = yield from self.pop8()
-            print(f'PLA \t\t--> [{spa:04X}]={self.A:02X} A={self.A:02X} SP={self.SP:02X} ')
+            self.N = (self.A >> 7) & 1
+            self.Z = (self.A == 0) & 1
+            print(f'PLA \t\t--> [{spa:04X}]={self.A:02X} A={self.A:02X} N={self.N} Z={self.Z} SP={self.SP:02X} ')
             
         elif (op == 'RTS'):
             self.SP = (self.SP + 1) & 0xFF
