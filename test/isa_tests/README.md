@@ -48,7 +48,6 @@ Test test_ctrflow_JMP.asm           = OK
 Test test_ctrflow_JSR.asm           = OK
 Test test_ctrflow_RTS.asm           = OK
 Test test_data_LDA.asm              = OK
-Test test_data_LDA_Immediate.asm    = OK
 Test test_data_LDX.asm              = OK
 Test test_data_LDY.asm              = OK
 Test test_data_PHA.asm              = OK
@@ -69,7 +68,7 @@ Test test_mcu_CLC.asm               = OK
 Test test_mcu_CLD.asm               = OK
 Test test_mcu_SEC.asm               = OK
 Test test_mcu_SED.asm               = OK
-Total: 40 Correct: 40 (100.0 %)
+Total: 39 Correct: 39 (100.0 %)
 ```
 
 ## Multi-cycle structural design
@@ -117,7 +116,6 @@ Test test_ctrflow_JMP.asm           = OK
 Test test_ctrflow_JSR.asm           = OK
 Test test_ctrflow_RTS.asm           = OK
 Test test_data_LDA.asm              = OK
-Test test_data_LDA_Immediate.asm    = OK
 Test test_data_LDX.asm              = OK
 Test test_data_LDY.asm              = OK
 Test test_data_PHA.asm              = OK
@@ -138,5 +136,5 @@ Test test_mcu_CLC.asm               = OK
 Test test_mcu_CLD.asm               = OK
 Test test_mcu_SEC.asm               = OK
 Test test_mcu_SED.asm               = OK
-Total: 40 Correct: 38 (95.0 %)
+Total: 39 Correct: 39 (100.0 %)
 ```

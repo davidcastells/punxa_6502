@@ -9,6 +9,9 @@ still17 target mnemonics. $A9 was already covered, so B3 added no SingleCycle
 target mnemonic/opcode pair. That subset
 checks A/Z on5 cases and actually passes on both models (481/974 clocks);
 this is not full LDA correctness or a new full-suite run.
+LDA consolidation (2026-11-09): that subset is now Cases 33-37 of
+[test_data_LDA.asm](isa/test_data_LDA.asm) and test_data_LDA_Immediate.asm
+was removed; the suite has 39 files, one per target mnemonic.
 See the [MultiCycle matrix](MULTICYCLE_COMPATIBILITY.md) for compatibility limits.
 
 ## Counting and interpretation
@@ -27,6 +30,7 @@ See the [MultiCycle matrix](MULTICYCLE_COMPATIBILITY.md) for compatibility limit
 The denominator is the reviewed Execute-path inventory, including defective paths,
 not the full NMOS opcode table. Helpers and negative controls add no target pairs.
 The second LDA file repeats an existing target, so36 files target35 mnemonics.
+(Batch 6 counts; the second LDA file has since been merged into test_data_LDA.asm.)
 
 Fully implemented means the reviewed RAM functional logic is present, not
 independently verified unless Test Result says so. Partially implemented
@@ -42,7 +46,7 @@ A=Accumulator; imp=Implied; rel=Relative.
 
 | Category | Instruction | CPU Implementation | CPU Addressing Modes | ISA Test | Tested Modes / Properties | Test Result | Remaining Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Data | LDA | Partially implemented | G8 | [Yes: test_data_LDA.asm](isa/test_data_LDA.asm) | G8; N/Z; C/V/D preservation samples | 29 PASS /3 FAIL (earlier isolated baseline); full FAIL30 | I preservation; mode-specific state combinations; known indirect wrapping |
+| Data | LDA | Partially implemented | G8 | [Yes: test_data_LDA.asm](isa/test_data_LDA.asm) | G8; N/Z; C/V/D preservation samples; immediate A/Z via direct branch (Cases 33-37) | 37 PASS on SingleCycle and MultiCycle (2026-11-09 full runs); earlier isolated baseline 29 PASS /3 FAIL | I preservation; mode-specific state combinations |
 | Data | LDX | Fully implemented | #, zp, zp,Y, abs, abs,Y | [Yes: test_data_LDX.asm](isa/test_data_LDX.asm) | five modes; X/N/Z | 15 PASS | C/V/D/I and other-register preservation; more address boundaries |
 | Data | LDY | Fully implemented | #, zp, zp,X, abs, abs,X | [Yes: test_data_LDY.asm](isa/test_data_LDY.asm) | five modes; 00/55/7F/80/FF; Y/N/Z, A/X/SP/C/V/D preservation, I=0; zp,X wrap and abs,X page crossing | 12 PASS; full PASS12,5750 clocks | I=1 preservation; full16-bit indexed wrap; exhaustive inputs/state combinations |
 | Data | STA | Partially implemented | G7 | [Yes: test_data_STA.asm](isa/test_data_STA.asm) | G7; address/data/guards, A/flags; I/V initially0 | 10 PASS | V=1/I=1 preservation; indirect boundaries; 16-bit wrap |
@@ -152,7 +156,8 @@ All original17 file outcomes/cases/clocks/PCs match Phase A; the B3 subset also
 passes. LDA31/32 and later unreached old cases were not re-executed this batch.
 The count74 combines historical62 with these disjoint12 target pairs.
 
-The unchanged shared MultiCycle LDA Immediate file was rerun: PASS5,974 clocks,
+The unchanged shared MultiCycle LDA Immediate file (now Cases 33-37 of
+test_data_LDA.asm) was rerun: PASS5,974 clocks,
 55 retired. New files are NOT_RUN on MultiCycle: all require missing CLD/PHP;
 STX also requires missing zp,Y and SBC has no dispatched Execute path.
 These static blockers are not dynamically executed FAIL/ERROR outcomes.

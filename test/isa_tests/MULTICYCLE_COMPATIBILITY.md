@@ -16,6 +16,9 @@ detail; the table uses UNSUPPORTED_CPU as the requested compatibility outcome.
 New shared file test_data_LDA_Immediate.asm: PASS on both models. Five target
 cases, one target mnemonic/mode (LDA immediate $A9), A and Z checked; N and
 preserved flags not formally covered. Helpers do not count as formal targets.
+Update 2026-11-09: those five cases are now Cases 33-37 of test_data_LDA.asm
+and the separate file was removed. The merged 37-case file passes on both
+models in full 39-file runs (39/39 each); the B3 table below is historical.
 
 Notation: G8=#,zp,zp,X,abs,abs,X,abs,Y,(zp,X),(zp),Y; G7=G8 without #;
 M4=zp,zp,X,abs,abs,X. C/Z/N/V/D/I are the real flags. Full P also checks PHP
