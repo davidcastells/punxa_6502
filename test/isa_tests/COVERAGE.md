@@ -1,4 +1,4 @@
-# ISA Coverage Matrix - after expansion Batch 6
+# ISA Coverage Matrix - after expansion Batch 6 and the 2026-11-10 stage update
 
 Updated 2026-10-27 from the completed review, Phase A/B3 and Batch 1-6 evidence.
 Implementation labels/modes are carried forward; no full CPU review was repeated.
@@ -13,6 +13,38 @@ LDA consolidation (2026-11-09): that subset is now Cases 33-37 of
 [test_data_LDA.asm](isa/test_data_LDA.asm) and test_data_LDA_Immediate.asm
 was removed; the suite has 39 files, one per target mnemonic.
 See the [MultiCycle matrix](MULTICYCLE_COMPATIBILITY.md) for compatibility limits.
+
+## Stage update 2026-11-10: EOR, LSR, CPX, BVC, BVS, CLI, SEI, CLV
+
+SingleCycle now has Execute paths for EOR (G8), LSR (A + M4), CPX (#, zp, abs),
+BVC/BVS (rel) and CLI/SEI/CLV (imp), each with its own test file. The suite has
+**47 files**, one per target mnemonic. MultiCycle was not changed and does
+**not** implement these eight instructions.
+
+| Model | Full-suite result 2026-11-10 |
+| --- | --- |
+| SingleCycle | **47/47 PASS** |
+| MultiCycle | **39/47 PASS**; the 8 new files fail with `op .. not handled` (CLI fails on its SEI helper `$78`) |
+
+Updated SingleCycle counts (decode baseline unchanged at 56 mnemonics / 151 pairs):
+
+- Execute paths: 39/116 before, **47/137** now (+21 pairs: EOR 8, LSR 5,
+  CPX 3, BVC/BVS/CLI/SEI/CLV 1 each).
+- Decoded without Execute: 17/35 before, **9/14** now (BIT, ROL, BCS, BMI,
+  BPL, PLP, BRK, RTI, NOP).
+- All 21 new pairs are executed as formal targets by the full 47-file run.
+  CPX abs ($EC) is tested in addition to the requested # and zp modes.
+
+Evidence for the new files: each failed at case 1 before its Execute path was
+added and passes after. Swapping each new instruction for a similar wrong one
+(e.g. EOR->ORA, LSR->ROR, CPX->CPY, BVC<->BVS, SEI->SEC, CLV->CLC) makes its
+file fail, and an independent reference model matched every target execution
+(registers, flags and a full 64 KiB memory comparison).
+
+The "Test Result" cells of older rows below are historical batch evidence
+(several record failures that have since been fixed). The current full-suite
+result above supersedes them. Known unrelated issues (legacy pytest failures,
+SingleCycle 16-bit address/PC wrapping) are listed in [README.md](README.md#known-issues-not-fixed-yet).
 
 ## Counting and interpretation
 
@@ -85,6 +117,14 @@ A=Accumulator; imp=Implied; rel=Relative.
 | Flags | SEC | Fully implemented | imp | [Yes: test_mcu_SEC.asm](isa/test_mcu_SEC.asm) | imp; carry set/idempotence, A/other flags | 3 PASS / 0 FAIL | I=1 preservation and further flag combinations |
 | Flags | CLD | Fully implemented | imp | No (helper) | - | Not verified | Independent D clear and other-state preservation |
 | Flags | SED | Fully implemented | imp | No (helper) | - | Not verified | Independent D set and other-state preservation |
+| Logic | EOR | SingleCycle: Fully implemented (2026-11-10); MultiCycle: not implemented | G8 | [Yes: test_logic_EOR.asm](isa/test_logic_EOR.asm) | G8; A/N/Z, X/Y/SP/C/V/D preservation, I=0; operand not written; zp,X wrap, abs,X/abs,Y/(zp),Y page crossing, (zp,X)/(zp),Y pointer wrap | SingleCycle 15 PASS; MultiCycle FAIL (op 49 not handled) | I=1 preservation; full 16-bit indexed wrap; exhaustive patterns |
+| Shift | LSR | SingleCycle: Fully implemented (2026-11-10); MultiCycle: not implemented | A + M4 | [Yes: test_bitmap_LSR.asm](isa/test_bitmap_LSR.asm) | A + M4; result, C from bit0, N=0, Z; incoming C not shifted in; memory write-back with neighbour/sentinel guards and A unchanged; V/D preserved, I=0; zp,X wrap, abs,X page crossing | SingleCycle 12 PASS; MultiCycle FAIL (op 4A not handled) | I=1 preservation; full 16-bit indexed wrap (known address-wrap issue); RMW bus timing |
+| Compare | CPX | SingleCycle: Fully implemented (2026-11-10); MultiCycle: not implemented | #, zp, abs | [Yes: test_arith_CPX.asm](isa/test_arith_CPX.asm) | #, zp, abs; equal/less/greater, unsigned C, wrapped N, Z; incoming C ignored; X/A/Y/SP/V/D preserved, I=0; operand unchanged; zp $FF | SingleCycle 12 PASS; MultiCycle FAIL (op E0 not handled) | I=1 preservation; exhaustive operand/status combinations |
+| Branch | BVC | SingleCycle: Fully implemented (2026-11-10); MultiCycle: not implemented | rel | [Yes: test_ctrflow_BVC.asm](isa/test_ctrflow_BVC.asm) | V=0 taken / V=1 not taken; C varied independently of V; forward/backward, page crossing both ways, +127/-128; path marker, A/X/Y/SP/flags | SingleCycle 8 PASS; MultiCycle FAIL (op 50 not handled) | Full 16-bit PC wrap (known PC-wrap issue); I=1 |
+| Branch | BVS | SingleCycle: Fully implemented (2026-11-10); MultiCycle: not implemented | rel | [Yes: test_ctrflow_BVS.asm](isa/test_ctrflow_BVS.asm) | V=1 taken / V=0 not taken; C varied independently of V; forward/backward, page crossing both ways, +127/-128; path marker, A/X/Y/SP/flags | SingleCycle 8 PASS; MultiCycle FAIL (op 70 not handled) | Full 16-bit PC wrap (known PC-wrap issue); I=1 |
+| Flags | SEI | SingleCycle: Fully implemented (2026-11-10); MultiCycle: not implemented | imp | [Yes: test_mcu_SEI.asm](isa/test_mcu_SEI.asm) | I 0->1 and 1->1; pre/post full P; A and N/Z/C/V/D preserved | SingleCycle 3 PASS; MultiCycle FAIL (op 78 not handled) | Interrupt acceptance (IRQ not modelled) |
+| Flags | CLI | SingleCycle: Fully implemented (2026-11-10); MultiCycle: not implemented | imp | [Yes: test_mcu_CLI.asm](isa/test_mcu_CLI.asm) | I 1->0 and 0->0; pre/post full P; A and N/Z/C/V/D preserved; I=1 set via SEI helper | SingleCycle 3 PASS; MultiCycle FAIL (helper SEI op 78 not handled) | I=1 setup without SEI (PLP/RTI missing); interrupt acceptance |
+| Flags | CLV | SingleCycle: Fully implemented (2026-11-10); MultiCycle: not implemented | imp | [Yes: test_mcu_CLV.asm](isa/test_mcu_CLV.asm) | V 1->0 and 0->0; pre/post full P; A and N/Z/C/D preserved; I=1 preserved (via SEI helper) | SingleCycle 4 PASS; MultiCycle FAIL (op B8 not handled) | Further status combinations |
 
 * All four ASL memory cases independently FAIL. First assertion checks write-back;
 later A/flags assertions are not reached. Actual wrong A/flags are retained
@@ -98,25 +138,19 @@ as an implementation finding; packed flags do not establish raw N normalization.
 
 | Category | Instruction | CPU Implementation | CPU Addressing Modes | ISA Test | Tested Modes | Test Result | Remaining Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Compare | CPX | Not implemented | None; Decode: #, zp, abs | No | - | Not verified | Execute and formal checks |
-| Logic | EOR | Not implemented | None; Decode: G8 | No | - | Not verified | Execute and formal checks |
 | Logic | BIT | Not implemented | None; Decode: zp, abs | No | - | Not verified | Execute and formal checks |
-| Shift | LSR | Not implemented | None; Decode: A + M4 | No | - | Not verified | Execute and formal checks |
 | Shift | ROL | Not implemented | None; Decode: A + M4 | No | - | Not verified | Execute and formal checks |
 | Branch | BCS | Not implemented | None; Decode: rel | No | - | Not verified | Execute and formal checks |
 | Branch | BMI | Not implemented | None; Decode: rel | No | - | Not verified | Execute and formal checks |
 | Branch | BPL | Not implemented | None; Decode: rel | No | - | Not verified | Execute and formal checks |
-| Branch | BVC | Not implemented | None; Decode: rel | No | - | Not verified | Execute and formal checks |
-| Branch | BVS | Not implemented | None; Decode: rel | No | - | Not verified | Execute and formal checks |
-| Flags | CLI | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
-| Flags | SEI | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
-| Flags | CLV | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
 | Stack | PLP | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
 | Interrupt | BRK | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
 | Interrupt | RTI | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
 | Misc | NOP | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
 
-These17 account for35 opcode/mode pairs. NOP falls through UNHANDLED; that
+These9 account for14 opcode/mode pairs (17/35 before 2026-11-10, when CPX,
+EOR, LSR, BVC, BVS, CLI, SEI and CLV moved to the SingleCycle Execute-path
+matrix above). NOP falls through UNHANDLED; that
 accidental empty behavior is not a dedicated implementation. Other decode-only
 instructions can also retire, so absence of exceptions does not prove support.
 
@@ -125,7 +159,8 @@ instructions can also retire, so absence of exceptions does not prove support.
 Untested Execute targets: ROR (5 pairs), JMP (2), CLD (1), SED (1).
 Auxiliary usage is not formal target coverage.
 
-Further gaps: Decimal arithmetic; I=1 setup/preservation (SEI/PLP/RTI missing);
+Further gaps: Decimal arithmetic; I=1 setup/preservation (SingleCycle SEI added
+2026-11-10, but PLP/RTI still missing and most older files only check I=0);
 shared indirect boundaries; full PC wrapping; exhaustive patterns;
 MMIO/timing/reset/IRQ/NMI; MultiCycle. ADC Decimal carry and SBC NMOS Decimal
 flags remain separate concerns without new executed cases.

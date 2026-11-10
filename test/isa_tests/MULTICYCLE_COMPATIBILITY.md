@@ -19,6 +19,12 @@ preserved flags not formally covered. Helpers do not count as formal targets.
 Update 2026-11-09: those five cases are now Cases 33-37 of test_data_LDA.asm
 and the separate file was removed. The merged 37-case file passes on both
 models in full 39-file runs (39/39 each); the B3 table below is historical.
+Update 2026-11-10: eight new files (EOR, LSR, CPX, BVC, BVS, CLI, SEI, CLV)
+were added and implemented in SingleCycle only (47/47 PASS). MultiCycle was
+not changed: full 47-file run is 39/47 PASS. The new files fail with
+`op .. not handled` ($49 EOR, $4A LSR, $E0 CPX, $50 BVC, $70 BVS, $78 SEI,
+$B8 CLV); test_mcu_CLI.asm fails on its SEI helper ($78) before reaching CLI.
+These are missing MultiCycle instructions, not assertion failures.
 
 Notation: G8=#,zp,zp,X,abs,abs,X,abs,Y,(zp,X),(zp),Y; G7=G8 without #;
 M4=zp,zp,X,abs,abs,X. C/Z/N/V/D/I are the real flags. Full P also checks PHP
