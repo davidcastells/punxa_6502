@@ -1,297 +1,126 @@
-# ISA Coverage Matrix - after expansion Batch 6
+# ISA test coverage
 
-Updated 2026-10-27 from the completed review, Phase A/B3 and Batch 1-6 evidence.
-Implementation labels/modes are carried forward; no full CPU review was repeated.
-Scope: SingleCycle6502 and documented original NMOS instructions.
+Updated 2026-11-11. This covers both processor models. For how to run the tests,
+see [README.md](README.md).
 
-B3 note: the shared LDA Immediate subset brought the count to18 files but
-still17 target mnemonics. $A9 was already covered, so B3 added no SingleCycle
-target mnemonic/opcode pair. That subset
-checks A/Z on5 cases and actually passes on both models (481/974 clocks);
-this is not full LDA correctness or a new full-suite run.
-See the [MultiCycle matrix](MULTICYCLE_COMPATIBILITY.md) for compatibility limits.
+## Summary
 
-## Counting and interpretation
+| | |
+| --- | --- |
+| Instructions in the decoder ([instruction_decode.py](../../punxa_6502/instruction_decode.py)) | 56 mnemonics, 151 opcode/mode pairs |
+| Instructions with a test file | **47 mnemonics, 137 pairs** |
+| Test cases | 405 |
+| SingleCycle full suite | **47/47 PASS** |
+| MultiCycle full suite | **47/47 PASS** |
+| Instructions without a test | 9 mnemonics, 14 pairs ([list below](#instructions-without-a-test)) |
 
-- Opcode/Decode baseline:56 mnemonics /151 opcode-mode pairs.
-- Actual Execute paths, including partial/defective behavior:39 /116.
-- Formal targets: **35/39=89.74%**, in36 files (Batch 5:32/39=82.05%).
-- Observed target pairs including retained isolated cases: **107/116=92.24%**
-  (Batch 5:101/116=87.07%). Batch 6 adds six distinct target opcode/mode pairs.
-- Sequential --all reaches **103/116=88.79%**. Four ASL memory forms were
-  actually executed only in isolated original case blocks after file failure.
-  Those historical isolated executions were not repeated in Batch 6.
-- No formal target coverage remains for4 Execute mnemonics /9 pairs.
-- Coverage includes meaningful failing checks; it is not CPU correctness.
+Every addressing mode of each of the 47 tested instructions runs as the target
+instruction in its own file, on both models. This was confirmed by recording
+the opcodes that actually executed during a full run.
 
-The denominator is the reviewed Execute-path inventory, including defective paths,
-not the full NMOS opcode table. Helpers and negative controls add no target pairs.
-The second LDA file repeats an existing target, so36 files target35 mnemonics.
+## How the tests check results
 
-Fully implemented means the reviewed RAM functional logic is present, not
-independently verified unless Test Result says so. Partially implemented
-has known semantic/shared-address limitations. Physical timing, MMIO and
-reset/interrupt correctness are not implied; stack requires explicit SP setup.
-Not verified means no independent target test, even if used as a helper.
+- Expected values are fixed constants. A test never uses the instruction under
+  test to compute its own expected result.
+- Flags are captured with `PHP` right after the target instruction, and the
+  whole status byte is compared (N, V, D, I, Z, C, plus B and bit 5 as pushed
+  by PHP).
+- Most tests also check that registers and memory the instruction should not
+  touch are unchanged (A, X, Y, SP, neighbouring bytes, guard bytes).
+- Decimal mode is never tested. Tests that do arithmetic clear D first.
+- I=0 at program start is the simulator's reset value. Tests that need I=1 set
+  it with `SEI`.
 
-G8 = #, zp, zp,X, abs, abs,X, abs,Y, (zp,X), (zp),Y.
-G7 = G8 without #. M4 = zp, zp,X, abs, abs,X.
-A=Accumulator; imp=Implied; rel=Relative.
+Mode names: `#` immediate, `zp` zero page, `abs` absolute, `rel` relative,
+`imp` implied, `A` accumulator. All 8 modes = `#`, `zp`, `zp,X`, `abs`, `abs,X`,
+`abs,Y`, `(zp,X)`, `(zp),Y`.
 
-## Execute-path matrix
+## Tested instructions
 
-| Category | Instruction | CPU Implementation | CPU Addressing Modes | ISA Test | Tested Modes / Properties | Test Result | Remaining Coverage |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Data | LDA | Partially implemented | G8 | [Yes: test_data_LDA.asm](isa/test_data_LDA.asm) | G8; N/Z; C/V/D preservation samples | 29 PASS /3 FAIL (earlier isolated baseline); full FAIL30 | I preservation; mode-specific state combinations; known indirect wrapping |
-| Data | LDX | Fully implemented | #, zp, zp,Y, abs, abs,Y | [Yes: test_data_LDX.asm](isa/test_data_LDX.asm) | five modes; X/N/Z | 15 PASS | C/V/D/I and other-register preservation; more address boundaries |
-| Data | LDY | Fully implemented | #, zp, zp,X, abs, abs,X | [Yes: test_data_LDY.asm](isa/test_data_LDY.asm) | five modes; 00/55/7F/80/FF; Y/N/Z, A/X/SP/C/V/D preservation, I=0; zp,X wrap and abs,X page crossing | 12 PASS; full PASS12,5750 clocks | I=1 preservation; full16-bit indexed wrap; exhaustive inputs/state combinations |
-| Data | STA | Partially implemented | G7 | [Yes: test_data_STA.asm](isa/test_data_STA.asm) | G7; address/data/guards, A/flags; I/V initially0 | 10 PASS | V=1/I=1 preservation; indirect boundaries; 16-bit wrap |
-| Data | STX | Fully implemented | zp, zp,Y, abs | [Yes: test_data_STX.asm](isa/test_data_STX.asm) | three modes; data/address/guards, zp,Y wrap, FFFF, X/A/Y/SP and flags | 8 PASS; full PASS8,5341 clocks | I=1 preservation; further values/status combinations |
-| Data | STY | Fully implemented | zp, zp,X, abs | [Yes: test_data_STY.asm](isa/test_data_STY.asm) | three modes; data/address/neighbor guards, Y/A/X/SP and flags; zp,X wrap and FFFF | 8 PASS; full PASS8,5341 clocks | I=1 preservation; further values/state combinations |
-| Transfer | TAX | Fully implemented | imp | [Yes: test_data_TAX.asm](isa/test_data_TAX.asm) | A to X; 00/01/7F/80/FF/55; opposing N/Z; A/Y/SP preserved; C/V/D varied, I=0 | 6 PASS; full PASS6,2898 clocks | I=1 preservation; exhaustive input/state combinations |
-| Transfer | TAY | Fully implemented | imp | [Yes: test_data_TAY.asm](isa/test_data_TAY.asm) | A->Y;00/01/7F/80/FF/55; opposing N/Z, A/X/SP/C/V/D preservation, I=0; three-transfer sequence with every intermediate snapshot checked | 7 scenarios PASS,9 targets; full PASS7,3749 clocks | I=1; further values/orderings, exhaustive state combinations |
-| Transfer | TXA | Fully implemented | imp | [Yes: test_data_TXA.asm](isa/test_data_TXA.asm) | X->A;00/01/7F/80/FF/55; opposing N/Z, X/Y/SP/C/V/D preservation, I=0;00->80->01 sequence | 7 scenarios PASS,9 targets; full PASS7,3749 clocks | I=1; further values/orderings, exhaustive state combinations |
-| Transfer | TYA | Fully implemented | imp | [Yes: test_data_TYA.asm](isa/test_data_TYA.asm) | Y->A;00/01/7F/80/FF/55; opposing N/Z, Y/X/SP/C/V/D preservation, I=0;00->80->01 sequence | 7 scenarios PASS,9 targets; full PASS7,3749 clocks | I=1; further values/orderings, exhaustive state combinations |
-| Transfer | TSX | Fully implemented | imp | [Yes: test_data_TSX.asm](isa/test_data_TSX.asm) | SP->X at00/01/7F/80/FF/55; opposing N/Z; SP/A/Y/C/V/D preserved, I=0;00->FF->FE sequence; fixed stack evidence and independent SP observations | 7 scenarios PASS,9 targets; full PASS7,4682 clocks | I=1; further values/sequences; physical reset/interrupt effects |
-| Transfer | TXS | Fully implemented | imp | [Yes: test_data_TXS.asm](isa/test_data_TXS.asm) | X->SP at00/01/7F/80/FF/55; A/X/Y and all flags at I=0 preserved;00->80->55 sequence; fixed PHP/PHA addresses/guards, no TSX oracle; independent SP observations | 7 scenarios PASS,9 targets; full PASS7,5648 clocks | I=1; further input/status combinations |
-| Arithmetic | ADC | Partially implemented | G8 | [Yes: test_arith_ADC.asm](isa/test_arith_ADC.asm) | G8 binary; A/C/Z/N/V, D=0 | 15 PASS | Decimal; I preservation; further operands and indirect boundaries |
-| Arithmetic | SBC | Partially implemented | G8 | [Yes: test_arith_SBC.asm](isa/test_arith_SBC.asm) | G8, D=0; A/C/Z/N/V; borrow-in/out, overflow both directions; zp,X wrap and page crossing; X/Y/SP preservation | 15 PASS; full PASS15,6681 clocks | Decimal deferred; indirect wrapping, full 16-bit wrap, exhaustive operands; I=1 |
-| Compare | CMP | Partially implemented | G8 | [Yes: test_arith_CMP.asm](isa/test_arith_CMP.asm) | G8; C/Z/N, A unchanged, V/D preserved; independent ADC oracle | 10 PASS / 0 FAIL | Indirect boundaries; I preservation; more operand/status combinations |
-| Compare | CPY | Fully implemented | #, zp, abs | [Yes: test_arith_CPY.asm](isa/test_arith_CPY.asm) | three modes; equality/less/greater in each; unsigned C, wrapped N, Z; incoming C ignored; Y/A/X/SP/V/D preserved, I=0; operand unchanged | 12 PASS; full PASS12,6015 clocks | I=1 preservation; exhaustive operand/status combinations |
-| Inc/Dec | INC | Partially implemented | M4 | [Yes: test_arith_INC.asm](isa/test_arith_INC.asm) | M4; memory/guards, N/Z, A/other flags | 4 PASS / 1 FAIL; full FAIL5 | Known FF to00 flags failure; more per-mode boundaries |
-| Inc/Dec | DEC | Partially implemented | M4 | [Yes: test_arith_DEC.asm](isa/test_arith_DEC.asm) | M4; fixed memory results and N/Z, A/X/Y/SP/C/V/D preservation, I=0; guards/sentinels, zp,X wrap and abs,X page crossing | 8 sequential PASS; full PASS8,5671 clocks; raw N=-1 in cases3/8 is a separate internal observation | Canonical internal N; underflow in zp/abs; I=1; exhaustive per-mode inputs, full16-bit indexed wrap, RMW timing |
-| Inc/Dec | INX | Partially implemented | imp | [Yes: test_arith_INX.asm](isa/test_arith_INX.asm) | imp; X/N/Z and C/V/D preservation; I=0 | 4 PASS / 2 FAIL; full FAIL5 | Known nonzero-even Z failures; exhaustive inputs/status combinations |
-| Inc/Dec | INY | Partially implemented | imp | [Yes: test_arith_INY.asm](isa/test_arith_INY.asm) | 00->01,01->02,7E->7F,7F->80,FE->FF,FF->00; live/saved Y, N/Z, A/X/SP/C/V/D preservation, I=0; guards | Full FAIL2,1007 clocks:1 PASS/1 FAIL/4 NOT_REACHED; retained isolated cases3-6 give aggregate3 PASS/3 FAIL | Confirmed incorrect Z and missing 8-bit Y wrap; assertions after first failure not implied; I=1; exhaustive states |
-| Inc/Dec | DEX | Fully implemented | imp | [Yes: test_arith_DEX.asm](isa/test_arith_DEX.asm) | ordinary/even results, 00->FF,01->00,80->7F,81->80; X/N/Z, A/Y/SP/C/V/D preservation, I=0; memory guards/no target writes | 8 PASS; full PASS8,4489 clocks | I=1; exhaustive inputs/state combinations |
-| Inc/Dec | DEY | Fully implemented | imp | [Yes: test_arith_DEY.asm](isa/test_arith_DEY.asm) | 02->01,01->00,00->FF,80->7F,81->80,FF->FE; live/saved Y, N/Z, A/X/SP/C/V/D preservation, I=0; guards | 6 sequential PASS; full PASS6,3480 clocks | I=1; exhaustive input/status combinations; reset/interrupt effects |
-| Logic | AND | Partially implemented | G8 | [Yes: test_logic_AND.asm](isa/test_logic_AND.asm) | G8; A/N/Z and C/V/D preservation | 10 PASS / 0 FAIL | Indirect boundaries; I preservation; further patterns/status combinations |
-| Logic | ORA | Partially implemented | G8 | [Yes: test_logic_ORA.asm](isa/test_logic_ORA.asm) | G8; complementary/zero/all-one/partial patterns; A/N/Z, X/Y/SP/C/V/D preservation, I=0; zp/indexed/indirect boundaries | 12 PASS /3 FAIL; full FAIL13,6030 clocks; 14/15 isolated FAIL | Known shared indirect pointer wrapping; later assertions after failed check; full16-bit wrap; I=1; exhaustive patterns |
-| Shift | ASL | Partially implemented | A + M4 (broken memory write-back) | [Yes: test_bitmap_ASL.asm](isa/test_bitmap_ASL.asm) | A + M4*; values/C/N/Z, memory write-back | 3 PASS / 6 FAIL; full FAIL4 | Known A width/write-back defects; later memory flag assertions not reached |
-| Shift | ROR | Partially implemented | A + M4 (broken memory write-back) | No | - | Not verified | Carry-in/out, N/Z and memory forms |
-| Branch | BCC | Partially implemented | rel | [Yes: test_ctrflow_BCC.asm](isa/test_ctrflow_BCC.asm) | C=0 taken/C=1 fallthrough; signed directions, taken page crossing and not-taken encoded crossing; +127/-128; path marker/exact PC and A/X/Y/SP/flags | 8 PASS; full PASS8,4176 clocks | Full16-bit PC wrap; I=1; offset0 and other flag/state combinations |
-| Branch | BEQ | Partially implemented | rel | [Yes: test_ctrflow_BEQ.asm](isa/test_ctrflow_BEQ.asm) | rel; conditions/directions/pages and A/flags | 6 PASS / 0 FAIL | Full PC wrap, I=1 preservation, displacement endpoints |
-| Branch | BNE | Partially implemented | rel | [Yes: test_ctrflow_BNE.asm](isa/test_ctrflow_BNE.asm) | rel; conditions, signed offsets/pages, limits, flags | 8 PASS | Full PC wrap and I=1 preservation |
-| Control flow | JMP | Partially implemented | abs; (abs) defective | No (helper) | - | Not verified | Absolute, full indirect pointer and NMOS page-end behavior |
-| Control flow | JSR | Fully implemented | abs | [Yes: test_ctrflow_JSR.asm](isa/test_ctrflow_JSR.asm) | abs; entry/frame/SP/flags, nesting, no RTS oracle | 3 PASS / 0 FAIL | Further nesting, frame and memory boundaries |
-| Control flow | RTS | Partially implemented | imp | [Yes: test_ctrflow_RTS.asm](isa/test_ctrflow_RTS.asm) | imp; manual frames/PC/SP/flags, page carry and nesting | 4 PASS / 0 FAIL | Full FFFF+1 PC wrap; further frame boundaries |
-| Stack | PHA | Fully implemented | imp | [Yes: test_data_PHA.asm](isa/test_data_PHA.asm) | imp; byte/address/SP/flags and wrap | 4 PASS / 0 FAIL | Further stack values/guards; I=1 preservation |
-| Stack | PHP | Fully implemented | imp | [Yes: test_data_PHP.asm](isa/test_data_PHP.asm) | Full raw30/32/B0/31/70/38/7B/F9 status bytes, B/bit5=1 and I=0; stack address/decrement/wrap/guards, registers, live C/Z; independent observations verify all live flags; three-push sequence | 9 scenarios PASS,11 targets; full PASS9,7289 clocks | I=1/arbitrary status patterns unavailable; live N/V/D/I preservation additionally needs observer, not assembly-only proof; reset/interrupt behavior |
-| Stack | PLA | Partially implemented | imp | [Yes: test_data_PLA.asm](isa/test_data_PLA.asm) | imp; byte/address/SP then N/Z; wrap | 0 PASS / 5 FAIL; full FAIL1 | Known missing N/Z updates; further inputs/status combinations |
-| Flags | CLC | Fully implemented | imp | [Yes: test_mcu_CLC.asm](isa/test_mcu_CLC.asm) | imp; carry clear/idempotence, A/other flags | 3 PASS / 0 FAIL | I=1 preservation and further flag combinations |
-| Flags | SEC | Fully implemented | imp | [Yes: test_mcu_SEC.asm](isa/test_mcu_SEC.asm) | imp; carry set/idempotence, A/other flags | 3 PASS / 0 FAIL | I=1 preservation and further flag combinations |
-| Flags | CLD | Fully implemented | imp | No (helper) | - | Not verified | Independent D clear and other-state preservation |
-| Flags | SED | Fully implemented | imp | No (helper) | - | Not verified | Independent D set and other-state preservation |
+| Group | Instruction | Test file | Modes tested | Cases | Main checks |
+| --- | --- | --- | --- | --- | --- |
+| Load/store | LDA | [test_data_LDA.asm](isa/test_data_LDA.asm) | all 8 | 37 | A, N/Z, other flags preserved; indexed and indirect address boundaries |
+| Load/store | LDX | [test_data_LDX.asm](isa/test_data_LDX.asm) | `#`, `zp`, `zp,Y`, `abs`, `abs,Y` | 15 | X, N/Z |
+| Load/store | LDY | [test_data_LDY.asm](isa/test_data_LDY.asm) | `#`, `zp`, `zp,X`, `abs`, `abs,X` | 12 | Y, N/Z, other state preserved; zp,X wrap, abs,X page crossing |
+| Load/store | STA | [test_data_STA.asm](isa/test_data_STA.asm) | all 8 except `#` | 10 | Stored byte and address, guard bytes, A and flags unchanged |
+| Load/store | STX | [test_data_STX.asm](isa/test_data_STX.asm) | `zp`, `zp,Y`, `abs` | 8 | Stored byte and address, zp,Y wrap, X and flags unchanged |
+| Load/store | STY | [test_data_STY.asm](isa/test_data_STY.asm) | `zp`, `zp,X`, `abs` | 8 | Stored byte and address, zp,X wrap, Y and flags unchanged |
+| Transfer | TAX, TAY, TXA, TYA | [TAX](isa/test_data_TAX.asm), [TAY](isa/test_data_TAY.asm), [TXA](isa/test_data_TXA.asm), [TYA](isa/test_data_TYA.asm) | `imp` | 6, 7, 7, 7 | Destination, N/Z, source and other state preserved; chained transfers |
+| Transfer | TSX | [test_data_TSX.asm](isa/test_data_TSX.asm) | `imp` | 7 | SP to X, N/Z, SP unchanged |
+| Transfer | TXS | [test_data_TXS.asm](isa/test_data_TXS.asm) | `imp` | 7 | X to SP, all flags unchanged; checked through fixed stack writes |
+| Stack | PHA | [test_data_PHA.asm](isa/test_data_PHA.asm) | `imp` | 4 | Pushed byte, address, SP decrement and wrap, flags |
+| Stack | PHP | [test_data_PHP.asm](isa/test_data_PHP.asm) | `imp` | 9 | Full pushed status byte (B and bit 5 = 1), SP, stack wrap |
+| Stack | PLA | [test_data_PLA.asm](isa/test_data_PLA.asm) | `imp` | 5 | Pulled byte, SP, N/Z |
+| Arithmetic | ADC | [test_arith_ADC.asm](isa/test_arith_ADC.asm) | all 8 | 15 | Binary A, C/Z/N/V |
+| Arithmetic | SBC | [test_arith_SBC.asm](isa/test_arith_SBC.asm) | all 8 | 15 | Binary A, C (borrow), Z/N/V; zp,X wrap, page crossing |
+| Compare | CMP | [test_arith_CMP.asm](isa/test_arith_CMP.asm) | all 8 | 10 | C/Z/N, A unchanged, V/D preserved |
+| Compare | CPX | [test_arith_CPX.asm](isa/test_arith_CPX.asm) | `#`, `zp`, `abs` | 12 | Equal/less/greater, C/Z/N, incoming C ignored, A/X/Y/SP and operand unchanged |
+| Compare | CPY | [test_arith_CPY.asm](isa/test_arith_CPY.asm) | `#`, `zp`, `abs` | 12 | Same checks as CPX, for Y |
+| Inc/dec | INC, DEC | [INC](isa/test_arith_INC.asm), [DEC](isa/test_arith_DEC.asm) | `zp`, `zp,X`, `abs`, `abs,X` | 5, 8 | Memory result, N/Z, guards, other state preserved |
+| Inc/dec | INX, INY, DEX, DEY | [INX](isa/test_arith_INX.asm), [INY](isa/test_arith_INY.asm), [DEX](isa/test_arith_DEX.asm), [DEY](isa/test_arith_DEY.asm) | `imp` | 6, 6, 8, 6 | Register result, 8-bit wrap, N/Z, other state preserved |
+| Logic | AND | [test_logic_AND.asm](isa/test_logic_AND.asm) | all 8 | 10 | A, N/Z, C/V/D preserved |
+| Logic | ORA | [test_logic_ORA.asm](isa/test_logic_ORA.asm) | all 8 | 15 | A, N/Z, other state preserved; zero-page pointer wrap |
+| Logic | EOR | [test_logic_EOR.asm](isa/test_logic_EOR.asm) | all 8 | 15 | A, N/Z, other state preserved, operand not written; zp,X wrap, page crossing, pointer wrap |
+| Shift | ASL | [test_bitmap_ASL.asm](isa/test_bitmap_ASL.asm) | `A`, `zp`, `zp,X`, `abs`, `abs,X` | 9 | Result, C/N/Z, memory write-back |
+| Shift | LSR | [test_bitmap_LSR.asm](isa/test_bitmap_LSR.asm) | `A`, `zp`, `zp,X`, `abs`, `abs,X` | 12 | Result, C = old bit 0, N = 0, incoming C not shifted in; write-back, A kept, guards |
+| Shift | ROR | [test_bitmap_ROR.asm](isa/test_bitmap_ROR.asm) | `A`, `zp`, `zp,X`, `abs`, `abs,X` | 12 | Result, carry in and out, N/Z; write-back, A kept, guards |
+| Branch | BCC, BEQ, BNE, BVC, BVS | [BCC](isa/test_ctrflow_BCC.asm), [BEQ](isa/test_ctrflow_BEQ.asm), [BNE](isa/test_ctrflow_BNE.asm), [BVC](isa/test_ctrflow_BVC.asm), [BVS](isa/test_ctrflow_BVS.asm) | `rel` | 8, 6, 8, 8, 8 | Taken and not taken, forward and backward, page crossing, +127/-128, flags unchanged |
+| Jump | JMP | [test_ctrflow_JMP.asm](isa/test_ctrflow_JMP.asm) | `abs`, `(abs)` | 7 | Target address; `($xxFF)` reads its high byte from `$xx00` (NMOS behaviour) |
+| Jump | JSR, RTS | [JSR](isa/test_ctrflow_JSR.asm), [RTS](isa/test_ctrflow_RTS.asm) | `abs`, `imp` | 3, 4 | Return address on the stack, SP, nesting, flags |
+| Flags | CLC, SEC | [CLC](isa/test_mcu_CLC.asm), [SEC](isa/test_mcu_SEC.asm) | `imp` | 3, 3 | Target flag, other flags and A preserved |
+| Flags | CLD, SED | [CLD](isa/test_mcu_CLD.asm), [SED](isa/test_mcu_SED.asm) | `imp` | 6, 6 | Target flag, other flags and A/X/Y/SP preserved |
+| Flags | CLI, SEI | [CLI](isa/test_mcu_CLI.asm), [SEI](isa/test_mcu_SEI.asm) | `imp` | 3, 3 | I flag, other flags preserved (CLI uses SEI to set I=1) |
+| Flags | CLV | [test_mcu_CLV.asm](isa/test_mcu_CLV.asm) | `imp` | 4 | V flag, other flags preserved, including I=1 |
 
-* All four ASL memory cases independently FAIL. First assertion checks write-back;
-later A/flags assertions are not reached. Actual wrong A/flags are retained
-as independent target-retirement observations.
+## Instructions without a test
 
-DEC remains a formal ISA PASS: all asserted memory bytes and packed status bits
-match fixed expectations. Its noncanonical internal N=-1 in cases3/8 is retained
-as an implementation finding; packed flags do not establish raw N normalization.
+These 9 instructions are in the decoder but have no test file.
 
-## Defined/decoded standard instructions without dedicated Execute
+| Instruction | Modes | SingleCycle | MultiCycle |
+| --- | --- | --- | --- |
+| BCS, BMI | `rel` | Not implemented | Not implemented |
+| BPL | `rel` | Not implemented | Implemented, untested |
+| BIT | `zp`, `abs` | Not implemented | Not implemented |
+| ROL | `A`, `zp`, `zp,X`, `abs`, `abs,X` | Not implemented | Not implemented |
+| PLP | `imp` | Not implemented | Not implemented |
+| BRK, RTI | `imp` | Not implemented | Implemented, untested |
+| NOP | `imp` | Not implemented | Not implemented |
 
-| Category | Instruction | CPU Implementation | CPU Addressing Modes | ISA Test | Tested Modes | Test Result | Remaining Coverage |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Compare | CPX | Not implemented | None; Decode: #, zp, abs | No | - | Not verified | Execute and formal checks |
-| Logic | EOR | Not implemented | None; Decode: G8 | No | - | Not verified | Execute and formal checks |
-| Logic | BIT | Not implemented | None; Decode: zp, abs | No | - | Not verified | Execute and formal checks |
-| Shift | LSR | Not implemented | None; Decode: A + M4 | No | - | Not verified | Execute and formal checks |
-| Shift | ROL | Not implemented | None; Decode: A + M4 | No | - | Not verified | Execute and formal checks |
-| Branch | BCS | Not implemented | None; Decode: rel | No | - | Not verified | Execute and formal checks |
-| Branch | BMI | Not implemented | None; Decode: rel | No | - | Not verified | Execute and formal checks |
-| Branch | BPL | Not implemented | None; Decode: rel | No | - | Not verified | Execute and formal checks |
-| Branch | BVC | Not implemented | None; Decode: rel | No | - | Not verified | Execute and formal checks |
-| Branch | BVS | Not implemented | None; Decode: rel | No | - | Not verified | Execute and formal checks |
-| Flags | CLI | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
-| Flags | SEI | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
-| Flags | CLV | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
-| Stack | PLP | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
-| Interrupt | BRK | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
-| Interrupt | RTI | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
-| Misc | NOP | Not implemented | None; Decode: imp | No | - | Not verified | Execute and formal checks |
+"Not implemented" in MultiCycle means the CPU stops with `op XX not handled`.
+In SingleCycle, an unimplemented instruction may finish without an error and
+without doing anything, so a test that does not crash does not prove the
+instruction is supported.
 
-These17 account for35 opcode/mode pairs. NOP falls through UNHANDLED; that
-accidental empty behavior is not a dedicated implementation. Other decode-only
-instructions can also retire, so absence of exceptions does not prove support.
+## Coverage gaps
 
-## Remaining gaps and evidence
+These behaviours are not tested by any file:
 
-Untested Execute targets: ROR (5 pairs), JMP (2), CLD (1), SED (1).
-Auxiliary usage is not formal target coverage.
+- Decimal mode (BCD) for ADC and SBC.
+- Interrupts (IRQ, NMI, BRK/RTI) and reset behaviour.
+- Setting I=1 with PLP or RTI (only SEI is available).
+- Addresses or branch targets that wrap past `$FFFF`.
+- Timing (number of clock cycles per instruction).
+- Exhaustive input values. The tests use chosen boundary values.
 
-Further gaps: Decimal arithmetic; I=1 setup/preservation (SEI/PLP/RTI missing);
-shared indirect boundaries; full PC wrapping; exhaustive patterns;
-MMIO/timing/reset/IRQ/NMI; MultiCycle. ADC Decimal carry and SBC NMOS Decimal
-flags remain separate concerns without new executed cases.
+## Known issues
 
-Baseline sources: [instruction_decode.py](../../punxa_6502/instruction_decode.py)
-and [singlecycle_processor.py](../../punxa_6502/algorithmic/singlecycle_processor.py).
-Known locations: indirect189-209; ASL271-276; DEC313-318; INC329-334;
-INX335-339; INY340-344;
-PLA487-489; indirect JMP179-188; RTS491-505. The comment questioning NMOS LDY
-$B4 is incorrect; the mapped zp,X form is included. No decoder/CPU fix was made.
+None of these make a test fail.
 
-Historical isolated LDA cases give29 PASS/3 FAIL; later full-suite runs stop
-at case30. Retained observations are distinguished from current sequential
-execution throughout this matrix; no local result directory is needed to read it.
+| Area | Issue | Location |
+| --- | --- | --- |
+| SingleCycle | `abs,X` and `abs,Y` do not wrap at 16 bits, so `$FFFF,X` gives an address above 64 KiB. | [singlecycle_processor.py](../../punxa_6502/algorithmic/singlecycle_processor.py), lines 179 and 186 |
+| SingleCycle | Taken branches do not wrap the PC at `$FFFF`. | same file, lines 298-322 |
+| SingleCycle | DEC computes `w - 1` without masking, so `$00 - 1` leaves the internal N flag at `-1` instead of `1`. The value written to memory and the status byte pushed by PHP are still correct, which is why the DEC test passes. | same file, DEC branch (line 357) |
+| Test tooling | `test_runner_assembly.py` and `test_testbench.py` (79 failures) and `test_multicycle_testbench.py` (7 failures) call runner functions such as `execute_test` that were removed from the runners in commit `4b310c9`. `test_assembly.py` passes. The `.asm` suites are not affected. | these pytest files |
 
-Historical Phase A file results: **12 PASS /5 FAIL /0 TIMEOUT /0 ERROR**, exit1.
-Phase A's new68 cases: **54 PASS /14 FAIL**, including isolated original blocks.
-Phase A sequential new files:54 PASS /4 FAIL /10 NOT_REACHED.
-No file PASS rate is used as an opcode coverage percentage.
+MultiCycle limitations are listed in
+[MULTICYCLE_COMPATIBILITY.md](MULTICYCLE_COMPATIBILITY.md#limitations).
 
-## Batch 1 observed increment
+## History
 
-TAX $AA; STX $86/$96/$8E; SBC $E9/$E5/$F5/$ED/$FD/$F9/$E1/$F1
-all retired at their exported target probes with fixed expectations and completed
-self-checks. All29 new cases PASS; no CPU difference was reproduced by them.
-The full21-file SingleCycle run is16 PASS /5 FAIL /0 TIMEOUT /0 ERROR, exit1.
-All original17 file outcomes/cases/clocks/PCs match Phase A; the B3 subset also
-passes. LDA31/32 and later unreached old cases were not re-executed this batch.
-The count74 combines historical62 with these disjoint12 target pairs.
-
-The unchanged shared MultiCycle LDA Immediate file was rerun: PASS5,974 clocks,
-55 retired. New files are NOT_RUN on MultiCycle: all require missing CLD/PHP;
-STX also requires missing zp,Y and SBC has no dispatched Execute path.
-These static blockers are not dynamically executed FAIL/ERROR outcomes.
-
-Batch 1 also checked per-case states, bus addresses/data and three negative
-controls. Those diagnostic executions add no formal target pairs.
-
-## Batch 2 observed increment
-
-LDY $A0/$A4/$B4/$AC/$BC; STY $84/$94/$8C; CPY $C0/$C4/$CC all actually
-retired at their target probes and completed the fixed self-checks. All32 new
-cases PASS. Full24-file SingleCycle --all:19 PASS /5 FAIL /0 TIMEOUT /0 ERROR,
-exit1. All21 prior outcomes/cases/clocks/PCs match Batch 1; no new CPU semantic
-difference was reproduced. Old cases after a file's first failure were not rerun.
-Coverage85 combines retained historical74 with these disjoint11 target pairs.
-
-LDY does not use STY/CPY to assert Y. TAY/TYA/TSX/PHP have a focused diagnostic
-preflight; read-only target observations also confirm saved checker bytes.
-STY and CPY use the already-verified LDY. CPY assertions use literal-byte CMP
-equality, not CPY itself. Helper/diagnostic executions add no formal target count.
-
-New files are NOT_RUN on MultiCycle. All require missing CLD/PHP/SEC/SED;
-LDY lacks zp/zp,X/abs/abs,X, STY lacks zp/zp,X, and CPY lacks zp/abs dispatch.
-Static presence of LDY#, STY abs and CPY# is not semantic validation or evidence
-that an unchanged complete file is executable. No MultiCycle simulation was run
-in Batch 2. Per-case observations and negative controls support the outcomes
-above without adding formal target pairs.
-
-## Batch 3 observed increment
-
-ORA $09/$05/$15/$0D/$1D/$19/$01/$11; BCC $90; DEX $CA all actually retired
-as formal targets. Full ORA reaches cases1-13 (12 PASS /1 FAIL;14/15 NOT_REACHED).
-Original cases13/14/15 then independently FAIL, retaining assertions and expected
-values: aggregate ORA12 PASS /3 FAIL. BCC8 PASS and DEX8 PASS. These31 new
-cases yield28 PASS /3 FAIL, with no ERROR/TIMEOUT. Full27-file --all is21 PASS /
-6 FAIL, exit1; all24 prior outcomes/cases/clocks/PCs match Batch 2.
-
-ORA13 reads pointer0100/0101 and operand1900 instead of pointer0000/0001 and
-operand1800; ORA14/15 read pointer00FF/0100 instead of00FF/0000, loading1900/
-1901 instead of1800/1801. This newly confirms ORA's exposure to the previously
-known shared addressing defects, not a new OR boolean-operation defect.
-Case14 checks flags successfully then fails on A;13/15 fail first on flags.
-Independent observations do not imply later assembly assertions executed.
-
-BCC checks every retirement PC and distinct path stores, including both page
-directions and signed limits. Its wrong-destination control fails on the path
-marker. DEX samples nonzero even results with Z=0, unlike the known INX defect;
-target bus monitoring shows no writes and memory guards remain intact.
-Coverage95 combines historical85 and ten new pairs, all reached by full files.
-
-All three are NOT_RUN on MultiCycle: CLD/PHP/SEC/SED helpers lack dispatch.
-ORA has only #/zp target paths; BCC lacks target dispatch; DEX has a path but
-its complete file is blocked. No MultiCycle execution or weakened variants.
-The full/isolated distinction, pointer reads and branch paths above are the
-coverage basis; negative-control executions add no formal pairs.
-
-## Batch 4 observed increment
-
-TAY $A8, TXA $8A and TYA $98 each actually retired nine times: six single-value
-cases plus three transfers in case7 (00->80->01). All seven scenarios per file
-PASS:21 scenarios /27 checked target retirements. Each source/destination,
-other register, SP and C/V/D/I=0 preservation check uses fixed expected snapshots.
-The source registers are initialized through LDA/LDX/LDY; assertions use stores
-and direct PHP bytes, with no reciprocal transfer as an oracle.
-
-Case7 captures all three intermediate register/status sets before comparisons.
-Only the checker PHP changes SP between targets: FF/FE/FD target entries and
-FC after three snapshots. Each target itself preserves its entry SP. Read-only
-observations verify all initial/retired states, saved bytes and no target writes.
-Negative TAY/TYA middle-snapshot controls FAIL even with the final transfer
-correct; the TXA wrong-Z control also FAILS. These diagnostics add no coverage.
-
-Full30-file --all:24 PASS /6 FAIL /0 TIMEOUT /0 ERROR, exit1. All27 prior file
-outcomes/cases/clocks/PCs match Batch 3. No new CPU difference was confirmed.
-Coverage98 combines historical95 and three implied pairs; repeated executions
-do not create extra pairs. Old isolated failures were not rerun this batch.
-
-MultiCycle has all three target dispatch branches, but required CLD/PHP/SEC/SED
-helpers still lack dispatch. All three unchanged files are NOT_RUN; no MultiCycle
-simulation or weakened variants. Captured-versus-checked negative controls
-are diagnostic evidence and add no formal target pairs.
-
-## Batch 5 observed increment
-
-TSX $BA, TXS $9A and PHP $08 actually retired9/9/11 times in7/7/9 numbered
-scenarios; all23 scenarios PASS. Each file includes a three-operation sequence
-and checks every intermediate snapshot. TSX checks00/01/7F/80/FF/55 plus
-00->FF->FE, including N/Z changes. TXS checks the same values plus00->80->55,
-preserving all six live flags at I=0 even when N/Z oppose the source byte.
-PHP checks raw30/32/B0/31/70/38/7B/F9 bytes, SP FF/80/01/00/7F/55 and three
-pushes at0101/0100/01FF. Guard checks stay inside the fixed stack page.
-
-TSX has a real setup PHA after TXS, fixed X/status assertions and independent
-read-only SP observations; TXS uses PHP/PHA writes at fixed addresses without
-TSX. PHP checks literal RAM bytes and independently observed writes/state;
-TSX checks SP only after target state capture, and a following PHA proves the
-next stack address. PHP immediately checks live C/Z with branches. All live
-flags are observed before/after each PHP: N/V/D/I preservation additionally
-depends on this independent observer, not on a second PHP or assembly-only proof.
-No PLA/PLP is used. Negative controls for wrong X, TXS N/Z and PHP bit5 each FAIL.
-
-I=0 is the current simulator initialization convention; NMOS reset sets I=1.
-SEI/PLP/RTI lack Execute paths, so I=1/arbitrary status combinations cannot be
-reliably established here. Every status byte checks bit2=0 explicitly; B and
-bit5 are each checked as1, not masked. No reset or interrupt claim is made.
-
-Full33-file --all:27 PASS /6 FAIL /0 TIMEOUT /0 ERROR, exit1. All30 prior file
-outcomes/cases/clocks/PCs match Batch 4, including six known failures. No new
-CPU difference was reproduced.101 observed pairs combine98 retained historical
-pairs and three new implied targets; sequential --all reaches97 pairs. Old
-isolated ASL failures were not rerun, and diagnostic controls add no coverage.
-
-All three unchanged files are NOT_RUN on MultiCycle. TSX/TXS have dispatch,
-but required PHP/SEC/CLD/SED do not. PHP itself has no dispatch and additionally
-requires missing BCC. Static dispatch presence does not prove full semantics;
-no weakened file or MultiCycle simulation was used.
-Case results, raw target/stack observations and negative controls support the
-historical Batch 5 baseline above.
-
-## Batch 6 observed increment
-
-INY $C8 and DEY $88 (implied), plus DEC $C6/$D6/$CE/$DE (zp/zp,X/abs/abs,X),
-all actually executed as formal targets. These six distinct pairs raise observed
-coverage from101 to107 and sequential coverage from97 to103. Repeated cases
-and isolated INY cases add no further pairs.
-
-INY's complete file stops at case2:1 PASS/1 FAIL/4 NOT_REACHED. Earlier isolated
-execution of the unchanged cases3-6 gives aggregate3 PASS/3 FAIL. The confirmed
-differences are incorrect Z for nonzero even results and missing 8-bit Y wrap.
-DEY's six and DEC's eight scenarios PASS sequentially. DEC's internal N=-1 in
-cases3/8 is separate from its correct byte write-back and packed status flags;
-it does not change DEC's formal PASS.
-
-Full36-file SingleCycle --all: **29 PASS /7 FAIL /0 TIMEOUT /0 ERROR**, exit1.
-All original33 outcomes/cases/clocks/PCs match Batch 5. The six prior failing
-files remain unchanged; INY adds the seventh. Six temporary negative controls
-detect incorrect value/flag expectations and are excluded from coverage.
-
-No MultiCycle run was performed for Batch 6. The unchanged complete new files
-require helpers recorded as unsupported there, including CLD/PHP/SEC/SED;
-they remain NOT_RUN, with no new MultiCycle correctness claim.
-See [BATCH6_SUMMARY.md](BATCH6_SUMMARY.md) for every new scenario, results and limits.
+The suite was built in stages (Phase A and Batches 1-6, then the instructions
+added on 2026-11-10 and 2026-11-11). The batch notes are kept in
+[BATCH6_SUMMARY.md](BATCH6_SUMMARY.md) and [LDA_REVIEW.md](LDA_REVIEW.md).
+The pass/fail numbers in those notes are historical. Many failures recorded
+there were fixed later, and the current results above replace them. Earlier
+versions of this file are in the Git history.
