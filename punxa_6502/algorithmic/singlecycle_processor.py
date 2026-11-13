@@ -330,7 +330,7 @@ class SingleCycle6502(py4hw.Logic):
             self.N = (cmp >> 7) & 1
             print(f'CPY {ws}\t--> C={self.C} N={self.N} Z={self.Z}')
         elif (op == 'DEC'):
-            R = w - 1;
+            R = (w - 1) & 0xFF
             self.N = R >> 7
             self.Z = (R == 0) & 1
             yield from self.memoryWrite(add, R)
