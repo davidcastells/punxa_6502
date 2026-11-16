@@ -594,12 +594,20 @@ class SingleCycle6502(py4hw.Logic):
             return self.Y
         elif (r == 'SP'):
             return self.SP
+        elif (r == 'N'):
+            return self.N
+        elif (r == 'V'):
+            return self.V
+        elif (r == 'B'):
+            # This model does not store B as a separate flag; PHP pushes B=1 as a constant
+            return 0
+        elif (r == 'D'):
+            return self.D
+        elif (r == 'I'):
+            return self.I
+        elif (r == 'Z'):
+            return self.Z
+        elif (r == 'C'):
+            return self.C
         else:
             raise Exception(f'register {r} not known')
-        
-         # self.N = 0 # negative flag
-         # self.V = 0 # overflow
-         # self.D = 0 # decimal
-         # self.I = 0 # disable interrupts
-         # self.Z = 0 # zero flag
-         # self.C = 0 # carry flag
