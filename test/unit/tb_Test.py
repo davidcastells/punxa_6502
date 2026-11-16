@@ -40,7 +40,18 @@ def buildHw(model):
                                           ])
     
     
-    cpu = punxa.SingleCycle6502(hw, 'cpu', port_c, reset, irq, nmi, 0)
+    if (model == 'sc'):
+        cpu = punxa.SingleCycle6502(hw, 'cpu', port_c, reset, irq, nmi, 0)
+    else:
+        cpu = punxa.MultiCycle6502(hw, 'cpu', port_c, reset, irq, nmi, 0)
+    
+        seq = cpu.children['control'].children['seq']
+        global wvf
+        watch = py4hw.debug.getPorts(seq)
+        watch.append(cpu.children['control']._wires['ins'])
+        watch.append(cpu.children['control']._wires['sel_cond'])
+        watch.append(cpu.children['control']._wires['dispatch'])
+        wvf = py4hw.Waveform(hw, 'wvf', watch)
     
     
     memory.reallocArea(0, 0x3000)
@@ -76,4 +87,6 @@ def buildHw(model):
     cmd._ci_cpu = cpu
     
     
-buildHw('sc')
+    
+    
+buildHw('mc')
