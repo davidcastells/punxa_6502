@@ -42,6 +42,8 @@ def buildHw(model):
     
     if (model == 'sc'):
         cpu = punxa.SingleCycle6502(hw, 'cpu', port_c, reset, irq, nmi, 0)
+    elif (model == 'mc'):
+        cpu = punxa.MultiCycleAlgorithmicControlUnit6502(hw, 'cpu', port_c, reset, irq, nmi, 0)
     else:
         cpu = punxa.MultiCycle6502(hw, 'cpu', port_c, reset, irq, nmi, 0)
     
@@ -89,4 +91,4 @@ def buildHw(model):
     
     
     
-buildHw('mc')
+buildHw('mic')
