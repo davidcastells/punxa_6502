@@ -188,15 +188,20 @@ class MicrocodingROM(py4hw.AsynchronousROM):
         tree = self._tree
         if tree is None:
             return
+        
         a = self.read_address.get()
+        
         items = tree.get_children()
         if a >= len(items):
             return
+        
         self._shown = a
         item = items[a]
         tree.selection_set(item)
         tree.focus(item)
-        self._scroll_to_row(a)
+        
+        print('Select ROM line:', a, item)
+        #self._scroll_to_row(a)
         
     def _viewport(self):
         """(first_row_index, visible_row_count) or None if not laid out yet."""
