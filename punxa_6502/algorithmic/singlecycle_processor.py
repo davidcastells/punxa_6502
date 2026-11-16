@@ -311,18 +311,42 @@ class SingleCycle6502(py4hw.Logic):
                 print(f'BNE {w:3} \t--> (Z={self.Z}) pc={self.pc:04X}' )
             else:
                 print(f'BNE {w:3} \t--> (Z={self.Z})' )
+        elif (op == 'BVC'):
+            if (self.V == 0):
+                self.pc += w
+                print(f'BVC {w:3} \t--> (V={self.V}) pc={self.pc:04X}' )
+            else:
+                print(f'BVC {w:3} \t--> (V={self.V})' )
+        elif (op == 'BVS'):
+            if (self.V):
+                self.pc += w
+                print(f'BVS {w:3} \t--> (V={self.V}) pc={self.pc:04X}' )
+            else:
+                print(f'BVS {w:3} \t--> (V={self.V})' )
         elif (op == 'CLC'):
             self.C = 0
             print('CLC     \t--> C=0')
         elif (op == 'CLD'):
             self.D = 0
             print(f'CLD {ws} \t--> {ms}D={self.D}')            
+        elif (op == 'CLI'):
+            self.I = 0
+            print(f'CLI {ws} \t--> I={self.I}')
+        elif (op == 'CLV'):
+            self.V = 0
+            print(f'CLV {ws} \t--> V={self.V}')
         elif (op == 'CMP'):
             cmp = (self.A - w) & 0xFF
             self.C = (self.A >= w) & 1
             self.Z = (self.A == w) & 1
             self.N = (cmp >> 7) & 1
             print(f'CMP {ws}\t--> {ms}C={self.C} N={self.N} Z={self.Z}')
+        elif (op == 'CPX'):
+            cmp = (self.X - w) & 0xFF
+            self.C = (self.X >= w) & 1
+            self.Z = (self.X == w) & 1
+            self.N = (cmp >> 7) & 1
+            print(f'CPX {ws}\t--> {ms}C={self.C} N={self.N} Z={self.Z}')
         elif (op == 'CPY'):
             cmp = (self.Y - w) & 0xFF
             self.C = (self.Y >= w) & 1
@@ -345,6 +369,11 @@ class SingleCycle6502(py4hw.Logic):
             self.N = self.Y >> 7
             self.Z = (self.Y == 0) & 1
             print(f'DEY \t\t--> Y={self.Y:02X} N={self.N} Z={self.Z}')            
+        elif (op == 'EOR'):
+            self.A = (self.A ^ w) & 0xFF
+            self.N = (self.A >> 7) & 1
+            self.Z = (self.A == 0) & 1
+            print(f'EOR {ws} \t--> {ms}A={self.A:02X} N={self.N} Z={self.Z}')
         elif (op == 'INC'):
             R = (w + 1) & 0xFF;
             self.N = (R >> 7) & 1
@@ -407,6 +436,22 @@ class SingleCycle6502(py4hw.Logic):
             self.N = w >> 7
             self.Z = (self.Y == 0) & 1
             print(f'LDY {ws} \t--> {ms}Y={w:02X} N={self.N} Z={self.Z}')
+        elif (op == 'LSR'):
+            # Logical shift right: bit0 -> C, 0 -> bit7, so N is always 0
+            if (addressing == punxa_6502.ADDRESSING_ACCUMULATOR):
+                self.C = self.A & 1
+                self.A = (self.A >> 1) & 0x7F
+                self.N = 0
+                self.Z = (self.A == 0) & 1
+                print(f'LSR {ws} \t--> A={self.A:02X} C={self.C} N={self.N} Z={self.Z}')
+            else:
+                # Memory addressing modes (ZeroPage, Absolute, ZeroPage,X, Absolute,X)
+                self.C = w & 1
+                R = (w >> 1) & 0x7F
+                self.N = 0
+                self.Z = (R == 0) & 1
+                yield from self.memoryWrite(add, R)
+                print(f'LSR {ws} \t--> {ms} [{add:04X}]={R:02X} C={self.C} N={self.N} Z={self.Z}')
         elif (op == 'ORA'):
             self.A = self.A | w
             self.N = self.A >> 7
@@ -485,6 +530,9 @@ class SingleCycle6502(py4hw.Logic):
         elif (op == 'SED'):
             self.D = 1
             print(f'SED {ws} \t--> {ms}D={self.D}')            
+        elif (op == 'SEI'):
+            self.I = 1
+            print(f'SEI {ws} \t--> I={self.I}')
         elif (op == 'STA'):
             yield from self.memoryWrite(add, self.A)
             print(f'STA {ws} \t--> [{add:04X}]={self.A:02X}')
@@ -594,12 +642,20 @@ class SingleCycle6502(py4hw.Logic):
             return self.Y
         elif (r == 'SP'):
             return self.SP
+        elif (r == 'N'):
+            return self.N
+        elif (r == 'V'):
+            return self.V
+        elif (r == 'B'):
+            # This model does not store B as a separate flag; PHP pushes B=1 as a constant
+            return 0
+        elif (r == 'D'):
+            return self.D
+        elif (r == 'I'):
+            return self.I
+        elif (r == 'Z'):
+            return self.Z
+        elif (r == 'C'):
+            return self.C
         else:
             raise Exception(f'register {r} not known')
-        
-         # self.N = 0 # negative flag
-         # self.V = 0 # overflow
-         # self.D = 0 # decimal
-         # self.I = 0 # disable interrupts
-         # self.Z = 0 # zero flag
-         # self.C = 0 # carry flag

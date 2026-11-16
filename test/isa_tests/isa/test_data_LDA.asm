@@ -1,6 +1,13 @@
 ; NMOS 6502 LDA functional ISA test.
+; One file for every LDA test case and addressing mode.
 ; Cases 1-8 retain the values/addressing checks of the original test.
-; All eight addressing modes, N/Z transitions, flag preservation and boundaries.
+; Cases 1-32: all eight addressing modes, N/Z transitions, flag preservation
+; and boundaries. Flags are checked through a PHP snapshot (CHECK_LDA).
+; Cases 33-37: immediate loads (formerly test_data_LDA_Immediate.asm, cases
+; 1-5). Z is checked directly by a branch right after the LDA (CHECK_Z), with
+; no stack, PHP, PLA or AND dependency.
+; Before any case, the comparison helpers are validated on both their taken
+; and not-taken paths; a failure there reports test_case 0.
 ; Reference: SY6500/MCS6500 Programming Manual, sections 2.1.1 and 6.1-6.5.
 ; No cycle-accurate bus timing is asserted.
 .setcpu "6502"
@@ -10,18 +17,36 @@
 
 actual = $2010 ; test-local scratch, separate from protocol and source data
 
+; Check Z directly with a branch; place immediately after the instruction.
+.macro CHECK_Z zero
+    .local correct
+    .if zero
+        beq correct
+    .else
+        bne correct
+    .endif
+    jmp fail
+correct:
+.endmacro
+
+; A must compare equal to expected AND unequal to its complement, so a
+; comparator/branch that always reports equality cannot pass.
 ; Preserve a local short branch; an absolute jump reaches fail in large tests.
 .macro CHECK_A expected
-    .local ok
+    .local equal, unequal
     cmp #expected
-    beq ok
+    beq equal
     jmp fail
-ok:
+equal:
+    cmp #(expected ^ $FF)
+    bne unequal
+    jmp fail
+unequal:
 .endmacro
 
 ; Snapshot flags BEFORE CMP or LDA changes them.
 ; STA/PHP preserve status. PLA's own flag effects happen after PHP's snapshot.
-; Requires functioning STA, PHP, PLA, AND, CMP, BEQ and JMP helpers.
+; Requires functioning STA, PHP, PLA, AND, CMP, BEQ, BNE and JMP helpers.
 .macro CHECK_LDA expected, flags, mask
     sta actual
     php
@@ -38,6 +63,17 @@ start:
     cld
     lda #0
     sta final_result
+
+    ; Guard the oracle's not-taken paths as well as the taken paths below.
+    lda #$55
+    cmp #$55
+    bne helper_bad
+    cmp #$AA
+    beq helper_bad
+    jmp helpers_ok
+helper_bad:
+    jmp fail
+helpers_ok:
 
 ; CASE 1: Immediate normal value (original case 1)
     TEST_CASE 1
@@ -350,6 +386,65 @@ start:
     lda #0
     lda ($FF),y
     CHECK_LDA $bc, $80, $82
+
+; Cases 33-37: immediate loads with Z checked directly by a branch.
+; Each target replaces a different A and the opposite initial Z.
+; N is covered by the CHECK_LDA cases above.
+
+; CASE 33: Immediate zero sets Z (former Immediate case 1)
+    TEST_CASE 33
+    lda #$80
+.export probe_33, after_33, passed_33
+probe_33:
+    lda #$00
+after_33:
+    CHECK_Z 1
+    CHECK_A $00
+passed_33:
+
+; CASE 34: Immediate positive value clears Z (former Immediate case 2)
+    TEST_CASE 34
+    lda #$00
+.export probe_34, after_34, passed_34
+probe_34:
+    lda #$3C
+after_34:
+    CHECK_Z 0
+    CHECK_A $3C
+passed_34:
+
+; CASE 35: Immediate $80 clears Z (former Immediate case 3)
+    TEST_CASE 35
+    lda #$00
+.export probe_35, after_35, passed_35
+probe_35:
+    lda #$80
+after_35:
+    CHECK_Z 0
+    CHECK_A $80
+passed_35:
+
+; CASE 36: Immediate $FF clears Z (former Immediate case 4)
+    TEST_CASE 36
+    lda #$00
+.export probe_36, after_36, passed_36
+probe_36:
+    lda #$FF
+after_36:
+    CHECK_Z 0
+    CHECK_A $FF
+passed_36:
+
+; CASE 37: Immediate alternating bits $A5 clears Z (former Immediate case 5)
+    TEST_CASE 37
+    lda #$00
+.export probe_37, after_37, passed_37
+probe_37:
+    lda #$A5
+after_37:
+    CHECK_Z 0
+    CHECK_A $A5
+passed_37:
 
 success:
     lda #1
