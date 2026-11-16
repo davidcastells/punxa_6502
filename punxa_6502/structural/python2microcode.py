@@ -7,7 +7,8 @@ Created on Sat Nov 14 20:01:46 2026
 
 import ast, inspect, sys, textwrap
 from collections import Counter
-from punxa_6502.structural.multicycle_processor import ControlUnit6502Behavioral
+
+from punxa_6502.algorithmic.control_unit import ControlUnit6502Algorithmic
 
 # ---------- custom AST nodes ----------
 class MicroLine(ast.stmt):                    # one clock cycle = one ROM line
@@ -92,7 +93,8 @@ class GroupCycles(ast.NodeTransformer):
                 out.append(MicroLine(pend, s.lineno)); pend = {}
             elif isinstance(s, ast.Expr) and isinstance(s.value, ast.YieldFrom):
                 call = s.value.value
-                if call.args: raise NotImplementedError(f'line {s.lineno}: call with arguments')
+                if call.args: 
+                    raise NotImplementedError(f'line {s.lineno}: call with arguments ')
                 if pend: raise NotImplementedError(f'line {s.lineno}: writes before call')
                 out.append(CallMicro(call.func.attr))
             elif (pc := prepare_call(s)):
