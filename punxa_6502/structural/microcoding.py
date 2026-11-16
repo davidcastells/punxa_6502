@@ -8,6 +8,7 @@ Created on Fri Nov 13 18:48:21 2026
 import py4hw
 
 from .sequencer import Sequencer
+from punxa_6502.algorithmic.control_unit import ControlUnit6502Algorithmic
 
 class MicrocodedControlUnit6502(py4hw.Logic):
     
@@ -125,10 +126,10 @@ class MicrocodedControlUnit6502(py4hw.Logic):
         rom_line= self.wire('rom_line', 3 + nsw + nac)
         
         from .python2microcode import Python2SequencerROM
-        from .multicycle_processor import ControlUnit6502Behavioral
+        
         rom = Python2SequencerROM(control_widths, cond_index, nsw, nac, 
                                   addr_width=rom_add_w , baseline={'alu_op': 0})
-        rom.analyzeClass(ControlUnit6502Behavioral)
+        rom.analyzeClass(ControlUnit6502Algorithmic)
         fetch_addr = rom.address_of('fetchIR')      # 257 with the current layout
 
         print(*rom.warnings, sep='\n')
