@@ -330,33 +330,33 @@ class ControlUnit6502Behavioral(py4hw.Logic):
     OPCODE_AND_ABSX =   0x3D
     OPCODE_ROL_ABSX =   0x3E
     OPCODE_RTI =        0x40
-    # _OPCODE_MAP[0x41] = ('EOR', ADDRESSING_INDIRECTX)
+    OPCODE_EOR_INDX =   0x41
     # # 0x42, 0x43, 0x44 are illegal/undocumented
-    # _OPCODE_MAP[0x45] = ('EOR', ADDRESSING_ZEROPAGE)
-    # _OPCODE_MAP[0x46] = ('LSR', ADDRESSING_ZEROPAGE)
+    OPCODE_EOR_ZP =     0x45
+    OPCODE_LSR_ZP =     0x46
     # # 0x47 is illegal/undocumented
     OPCODE_PHA =        0x48
     
-    # _OPCODE_MAP[0x49] = ('EOR', ADDRESSING_IMMEDIATE)
-    # _OPCODE_MAP[0x4A] = ('LSR', ADDRESSING_ACCUMULATOR)
+    OPCODE_EOR_IMM =    0x49
+    OPCODE_LSR_ACC =    0x4A
     # # 0x4B is illegal/undocumented
     OPCODE_JMP_ABS =    0x4C
-    # _OPCODE_MAP[0x4D] = ('EOR', ADDRESSING_ABSOLUTE)
-    # _OPCODE_MAP[0x4E] = ('LSR', ADDRESSING_ABSOLUTE)
+    OPCODE_EOR_ABS =    0x4D
+    OPCODE_LSR_ABS =    0x4E
     # # 0x4F is illegal/undocumented
 
     # # Row 0x50-0x5F
-    # _OPCODE_MAP[0x50] = ('BVC', ADDRESSING_RELATIVE)
-    # _OPCODE_MAP[0x51] = ('EOR', ADDRESSING_INDIRECTY)
+    OPCODE_BVC_REL =    0x50
+    OPCODE_EOR_INDY =   0x51
     # # 0x52, 0x53, 0x54 are illegal/undocumented
-    # _OPCODE_MAP[0x55] = ('EOR', ADDRESSING_ZEROPAGEX)
-    # _OPCODE_MAP[0x56] = ('LSR', ADDRESSING_ZEROPAGEX)
+    OPCODE_EOR_ZPX =    0x55
+    OPCODE_LSR_ZPX =    0x56
     # # 0x57 is illegal/undocumented
-    # _OPCODE_MAP[0x58] = ('CLI', ADDRESSING_IMPLIED)
-    # _OPCODE_MAP[0x59] = ('EOR', ADDRESSING_ABSOLUTEY)
+    OPCODE_CLI =        0x58
+    OPCODE_EOR_ABSY =   0x59
     # # 0x5A, 0x5B, 0x5C are illegal/undocumented
-    # _OPCODE_MAP[0x5D] = ('EOR', ADDRESSING_ABSOLUTEX)
-    # _OPCODE_MAP[0x5E] = ('LSR', ADDRESSING_ABSOLUTEX)
+    OPCODE_EOR_ABSX =   0x5D
+    OPCODE_LSR_ABSX =   0x5E
     # # 0x5F is illegal/undocumented
 
     # # Row 0x60-0x6F
@@ -375,13 +375,13 @@ class ControlUnit6502Behavioral(py4hw.Logic):
     # # 0x6F is illegal/undocumented
 
     # # Row 0x70-0x7F
-    # _OPCODE_MAP[0x70] = ('BVS', ADDRESSING_RELATIVE)
+    OPCODE_BVS_REL =    0x70
     OPCODE_ADC_INDY =   0x71
     # # 0x72, 0x73, 0x74 are illegal/undocumented
     OPCODE_ADC_ZPX =    0x75
     OPCODE_ROR_ZPX =    0x76
     # # 0x77 is illegal/undocumented
-    # _OPCODE_MAP[0x78] = ('SEI', ADDRESSING_IMPLIED)
+    OPCODE_SEI =        0x78
     OPCODE_ADC_ABSY =   0x79
     # # 0x7A, 0x7B, 0x7C are illegal/undocumented
     OPCODE_ADC_ABSX =   0x7D
@@ -429,7 +429,7 @@ class ControlUnit6502Behavioral(py4hw.Logic):
     OPCODE_LDX_ZPY =    0xB6
     
     # # 0xB7 is illegal/undocumented
-    # _OPCODE_MAP[0xB8] = ('CLV', ADDRESSING_IMPLIED)
+    OPCODE_CLV =        0xB8
     OPCODE_LDA_ABSY =   0xB9
     OPCODE_TSX =        0xBA
     # # 0xBB is illegal/undocumented
@@ -470,10 +470,10 @@ class ControlUnit6502Behavioral(py4hw.Logic):
     # # 0xDF is illegal/undocumented
 
     # # Row 0xE0-0xEF
-    # _OPCODE_MAP[0xE0] = ('CPX', ADDRESSING_IMMEDIATE)
+    OPCODE_CPX_IMM =    0xE0
     OPCODE_SBC_INDX =   0xE1
     # # 0xE2, 0xE3 are illegal/undocumented
-    # _OPCODE_MAP[0xE4] = ('CPX', ADDRESSING_ZEROPAGE)
+    OPCODE_CPX_ZP =     0xE4
     OPCODE_SBC_ZP =     0xE5
     OPCODE_INC_ZP =     0xE6
     # # 0xE7 is illegal/undocumented
@@ -1365,7 +1365,29 @@ class ControlUnit6502Behavioral(py4hw.Logic):
         w = self.parent.children['datapath']._wires['q_MBR'].get()
         w = py4hw.IntegerHelper.c2_to_signed(w, 8)
         print(f'\t\tBPL {w:3} \t--> (N={n})')
-        
+
+    def executeBVC_REL(self):
+        yield from self.incPC()
+        yield from self.fetchMBR()         # signed offset -> MBR
+        yield from self.incPC()            # PC now points to the next instruction
+        v = self.status['q_V'].get()
+        if (v == 0):
+            yield from self.addMBR_to_PC() # PC = PC + signed offset
+        w = self.parent.children['datapath']._wires['q_MBR'].get()
+        w = py4hw.IntegerHelper.c2_to_signed(w, 8)
+        print(f'\t\tBVC {w:3} \t--> (V={v})')
+
+    def executeBVS_REL(self):
+        yield from self.incPC()
+        yield from self.fetchMBR()         # signed offset -> MBR
+        yield from self.incPC()            # PC now points to the next instruction
+        v = self.status['q_V'].get()
+        if (v):
+            yield from self.addMBR_to_PC() # PC = PC + signed offset
+        w = self.parent.children['datapath']._wires['q_MBR'].get()
+        w = py4hw.IntegerHelper.c2_to_signed(w, 8)
+        print(f'\t\tBVS {w:3} \t--> (V={v})')
+
     def executeBRK(self):
         yield from self.incPC()            # skip the padding byte...
         yield from self.incPC()            # ...so PC = BRK address + 2
@@ -1403,7 +1425,33 @@ class ControlUnit6502Behavioral(py4hw.Logic):
         yield from self.incPC()
         d = self.status['q_D'].get()
         print(f'\t\tCLD \t\t--> (D={d})')
-        
+
+    def executeCLI(self):
+        control = self.control
+        control['d_I'].prepare(0)          # I input comes straight from d_I (sel_flags=0)
+        control['e_I'].prepare(1)
+        yield
+        control['e_I'].prepare(0)
+        yield
+
+        yield from self.incPC()
+        i = self.status['q_I'].get()
+        print(f'\t\tCLI \t\t--> (I={i})')
+
+    def executeCLV(self):
+        control = self.control
+        control['d_V'].prepare(0)
+        control['sel_V'].prepare(1)        # take V from the CU, not the ALU
+        control['e_V'].prepare(1)
+        yield
+        control['sel_V'].prepare(0)        # back to the ALU overflow (ADC/SBC rely on it)
+        control['e_V'].prepare(0)
+        yield
+
+        yield from self.incPC()
+        v = self.status['q_V'].get()
+        print(f'\t\tCLV \t\t--> (V={v})')
+
     def executeCMP_ABS(self):
         yield from self.incPC()
         yield from self.fetchMAR_lo()      # address low byte -> MAR_lo
@@ -1517,6 +1565,55 @@ class ControlUnit6502Behavioral(py4hw.Logic):
         z = self.status['q_Z'].get()
         n = self.status['q_N'].get()
         print(f'\t\tCMP ${m:02X},X \t--> C={c} N={n} Z={z}')
+
+    def executeCPX_ABS(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()          # address low byte -> MAR_lo
+        yield from self.incPC()
+        yield from self.fetchMAR_hi()          # address high byte -> MAR_hi
+        a = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        b = self.parent.children['datapath']._wires['q_MAR_hi'].get()
+        yield from self.fetchMAR_MBR()         # M = mem[MAR] -> MBR (MAR is now free)
+        yield from self.transferA_to_MAR_lo()  # park A in the now-unused MAR_lo
+        yield from self.transferX_to_A()       # A = X (its N/Z update is overwritten by the CMP)
+        yield from self.aluCMP_MBR()           # flags from X - M
+        yield from self.transferMAR_lo_to_A()  # restore A
+        yield from self.incPC()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\tCPX ${b:02X}{a:02X} \t--> C={c} N={n} Z={z}')
+
+    def executeCPX_IMM(self):
+        # save A to MAR_lo to load X into A to do the comparison
+        # because (a) input of the ALU is hardcoded to A
+        yield from self.incPC()
+        yield from self.transferA_to_MAR_lo()
+        yield from self.transferX_to_A()       # A = X (its N/Z update is overwritten by the CMP)
+        yield from self.fetchMBR()
+        a = self.parent.children['datapath']._wires['q_MBR'].get()
+        yield from self.aluCMP_MBR()           # flags from X - M
+        yield from self.transferMAR_lo_to_A()  # restore A
+        yield from self.incPC()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\t\tCPX #{a:02X} \t--> C={c} N={n} Z={z}')
+
+    def executeCPX_ZP(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()          # zero-page address -> MAR_lo
+        yield from self.fetchZP_MBR()          # M = mem[0x00:MAR_lo] -> MBR
+        yield from self.transferA_to_MAR_hi()  # park A (MAR_hi is unused in zero page)
+        yield from self.transferX_to_A()       # A = X (its N/Z update is overwritten by the CMP)
+        yield from self.aluCMP_MBR()           # flags from X - M
+        yield from self.transferMAR_hi_to_A()  # restore A
+        yield from self.incPC()
+        m = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\t\tCPX ${m:02X} \t--> C={c} N={n} Z={z}')
 
     def executeCPY_ABS(self):
         yield from self.incPC()
@@ -1636,6 +1733,135 @@ class ControlUnit6502Behavioral(py4hw.Logic):
         yield from self.decY()
         yield from self.incPC()
         print(f'\t\t\tDEY')
+
+    def executeEOR_ABS(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()      # address low byte -> MAR_lo
+        yield from self.incPC()
+        yield from self.fetchMAR_hi()      # address high byte -> MAR_hi
+        a = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        b = self.parent.children['datapath']._wires['q_MAR_hi'].get()
+        yield from self.fetchMAR_MBR()     # M = mem[MAR] -> MBR
+        yield from self.aluXOR_MBR()       # A = A ^ M, update N and Z
+        yield from self.incPC()
+        m = self.parent.children['datapath']._wires['q_MBR'].get()
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\tEOR ${b:02X}{a:02X} = {m:02X} \t--> A={r:02X} N={n} Z={z}')
+
+    def executeEOR_ABSX(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()      # base address low byte -> MAR_lo
+        yield from self.incPC()
+        yield from self.fetchMAR_hi()      # base address high byte -> MAR_hi
+        a = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        b = self.parent.children['datapath']._wires['q_MAR_hi'].get()
+        yield from self.addX_to_MAR()      # MAR = base + X (carry into MAR_hi), A is preserved
+        mar = self.parent.children['datapath']._wires['q_MAR'].get()
+        yield from self.fetchMAR_MBR()     # M = mem[MAR] -> MBR
+        yield from self.aluXOR_MBR()       # A = A ^ M, update N and Z
+        yield from self.incPC()
+        m = self.parent.children['datapath']._wires['q_MBR'].get()
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\tEOR ${b:02X}{a:02X},X \t--> [{mar:04X}]={m:02X} A={r:02X} N={n} Z={z}')
+
+    def executeEOR_ABSY(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()      # base address low byte -> MAR_lo
+        yield from self.incPC()
+        yield from self.fetchMAR_hi()      # base address high byte -> MAR_hi
+        a = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        b = self.parent.children['datapath']._wires['q_MAR_hi'].get()
+        yield from self.addY_to_MAR()      # MAR = base + Y (carry into MAR_hi), A is preserved
+        mar = self.parent.children['datapath']._wires['q_MAR'].get()
+        yield from self.fetchMAR_MBR()     # M = mem[MAR] -> MBR
+        yield from self.aluXOR_MBR()       # A = A ^ M, update N and Z
+        yield from self.incPC()
+        m = self.parent.children['datapath']._wires['q_MBR'].get()
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\tEOR ${b:02X}{a:02X},Y \t--> [{mar:04X}]={m:02X} A={r:02X} N={n} Z={z}')
+
+    def executeEOR_IMM(self):
+        yield from self.incPC()
+        yield from self.fetchMBR()         # immediate operand -> MBR
+        yield from self.aluXOR_MBR()       # A = A ^ M, update N and Z
+        yield from self.incPC()
+        m = self.parent.children['datapath']._wires['q_MBR'].get()
+        a = self.parent.children['datapath']._wires['q_A'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\t\tEOR #{m:02X} \t--> A={a:02X} N={n} Z={z}')
+
+    def executeEOR_INDX(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()            # zero-page base -> MAR_lo
+        a = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        yield from self.addX_to_MAR()            # MAR_lo = (base + X) & 0xFF
+        yield from self.fetchZP_MBR()            # pointer low byte -> MBR
+        yield from self.incMAR_lo()              # (ptr + 1) & 0xFF, wraps in zero page
+        yield from self.fetchZP_MAR_hi()         # pointer high byte -> MAR_hi
+        yield from self.transferMBR_to_MAR_lo()  # MAR = 16-bit pointer
+        mar = self.parent.children['datapath']._wires['q_MAR'].get()
+        yield from self.fetchMAR_MBR()           # M = mem[pointer] -> MBR
+        yield from self.aluXOR_MBR()             # A = A ^ M, update N and Z
+        yield from self.incPC()
+        m = self.parent.children['datapath']._wires['q_MBR'].get()
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\t\tEOR $({a:02X},X) \t--> [{mar:04X}]={m:02X} A={r:02X} N={n} Z={z}')
+
+    def executeEOR_INDY(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()            # zero-page pointer address -> MAR_lo
+        a = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        yield from self.fetchZP_MBR()            # pointer low byte -> MBR
+        yield from self.incMAR_lo()              # (ptr + 1) & 0xFF, wraps in zero page
+        yield from self.fetchZP_MAR_hi()         # pointer high byte -> MAR_hi
+        yield from self.transferMBR_to_MAR_lo()  # MAR = 16-bit pointer
+        yield from self.addY_to_MAR()            # MAR = pointer + Y (carry into MAR_hi)
+        mar = self.parent.children['datapath']._wires['q_MAR'].get()
+        yield from self.fetchMAR_MBR()           # M = mem[MAR] -> MBR
+        yield from self.aluXOR_MBR()             # A = A ^ M, update N and Z
+        yield from self.incPC()
+        m = self.parent.children['datapath']._wires['q_MBR'].get()
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\t\tEOR $({a:02X}),Y \t--> [{mar:04X}]={m:02X} A={r:02X} N={n} Z={z}')
+
+    def executeEOR_ZP(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()      # zero-page address -> MAR_lo
+        yield from self.fetchZP_MBR()      # M = mem[0x00:MAR_lo] -> MBR
+        yield from self.aluXOR_MBR()       # A = A ^ M, update N and Z
+        yield from self.incPC()
+        addr = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        m = self.parent.children['datapath']._wires['q_MBR'].get()
+        a = self.parent.children['datapath']._wires['q_A'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\t\tEOR ${addr:02X} = {m:02X} \t--> A={a:02X} N={n} Z={z}')
+
+    def executeEOR_ZPX(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()      # base zero-page address -> MAR_lo
+        base = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        yield from self.addX_to_MAR()      # MAR_lo = (base + X) & 0xFF, A is preserved
+        mar = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        yield from self.fetchZP_MBR()      # M = mem[0x00:MAR_lo] -> MBR
+        yield from self.aluXOR_MBR()       # A = A ^ M, update N and Z
+        yield from self.incPC()
+        m = self.parent.children['datapath']._wires['q_MBR'].get()
+        a = self.parent.children['datapath']._wires['q_A'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\t\tEOR ${base:02X},X \t--> [{mar:02X}]={m:02X} A={a:02X} N={n} Z={z}')
 
     def executeINC_ABS(self):
         yield from self.incPC()
@@ -1933,6 +2159,97 @@ class ControlUnit6502Behavioral(py4hw.Logic):
         z = self.status['q_Z'].get()
         print(f'\t\tLDY ${m:02X},X \t--> Y={y:02X} N={n} Z={z}')        
         
+    # LSR reuses the ALU ROR path: ROR shifts q_C into bit 7, so clearing C first
+    # gives {0, M[7:1]} with C = old M[0] and N = 0. No dedicated ALU op is needed.
+
+    def executeLSR_ABS(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()          # address low byte -> MAR_lo
+        yield from self.incPC()
+        yield from self.fetchMAR_hi()          # address high byte -> MAR_hi
+        a = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        b = self.parent.children['datapath']._wires['q_MAR_hi'].get()
+        yield from self.pushA()                # save A on the stack (MAR still holds the address)
+        yield from self.fetchMAR_MBR()         # M = mem[MAR] -> MBR
+        yield from self.transferMBR_to_A()     # A = M
+        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.aluROR_A()             # A = {0, M[7:1]}, C = old M[0], N = 0, update Z
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        yield from self.storeA()               # mem[MAR] = A
+        yield from self.popA()                 # restore the real A
+        yield from self.incPC()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\tLSR ${b:02X}{a:02X} \t--> M={r:02X} C={c} N={n} Z={z}')
+
+    def executeLSR_ABSX(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()          # base address low byte -> MAR_lo
+        yield from self.incPC()
+        yield from self.fetchMAR_hi()          # base address high byte -> MAR_hi
+        a = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        b = self.parent.children['datapath']._wires['q_MAR_hi'].get()
+        yield from self.addX_to_MAR()          # MAR = base + X (carry into MAR_hi), A is preserved
+        yield from self.pushA()                # save A on the stack (MAR still holds the address)
+        yield from self.fetchMAR_MBR()         # M = mem[MAR] -> MBR
+        yield from self.transferMBR_to_A()     # A = M
+        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.aluROR_A()             # A = {0, M[7:1]}, C = old M[0], N = 0, update Z
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        yield from self.storeA()               # mem[MAR] = A
+        yield from self.popA()                 # restore the real A
+        yield from self.incPC()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\tLSR ${b:02X}{a:02X},X \t--> M={r:02X} C={c} N={n} Z={z}')
+
+    def executeLSR_ACC(self):
+        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.aluROR_A()             # A = {0, A[7:1]}, C = old A[0], N = 0, update Z
+        yield from self.incPC()
+        a = self.parent.children['datapath']._wires['q_A'].get()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\t\t\tLSR A\t\t--> A={a:02X} C={c} N={n} Z={z}')
+
+    def executeLSR_ZP(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()          # zero-page address -> MAR_lo
+        m = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        yield from self.transferA_to_MAR_hi()  # park A (MAR_hi is unused in zero page)
+        yield from self.fetchZP_A()            # A = M
+        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.aluROR_A()             # A = {0, M[7:1]}, C = old M[0], N = 0, update Z
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        yield from self.storeA_ZP()            # mem[0x00:MAR_lo] = A
+        yield from self.transferMAR_hi_to_A()  # restore the real A
+        yield from self.incPC()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\t\tLSR ${m:02X} \t--> M={r:02X} C={c} N={n} Z={z}')
+
+    def executeLSR_ZPX(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()          # base zero-page address -> MAR_lo
+        m = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        yield from self.addX_to_MAR()          # MAR_lo = (base + X) & 0xFF, A is preserved
+        yield from self.transferA_to_MAR_hi()  # park A (MAR_hi is unused in zero page)
+        yield from self.fetchZP_A()            # A = M
+        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.aluROR_A()             # A = {0, M[7:1]}, C = old M[0], N = 0, update Z
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        yield from self.storeA_ZP()            # mem[0x00:MAR_lo] = A
+        yield from self.transferMAR_hi_to_A()  # restore the real A
+        yield from self.incPC()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'\t\tLSR ${m:02X},X \t--> M={r:02X} C={c} N={n} Z={z}')
+
     def executeJMP_ABS(self):
         yield from self.incPC()
         yield from self.fetchMAR_lo()
@@ -2384,7 +2701,13 @@ class ControlUnit6502Behavioral(py4hw.Logic):
         yield from self.incPC()
         d = self.status['q_D'].get()
         print(f'\t\tSED \t\t--> (D={d})')
-        
+
+    def executeSEI(self):
+        yield from self.setI()             # d_I=1, e_I=1 for one cycle, then restored
+        yield from self.incPC()
+        i = self.status['q_I'].get()
+        print(f'\t\tSEI \t\t--> (I={i})')
+
     def executeSTA_ABS(self):
         yield from self.incPC()
         yield from self.fetchMAR_lo()
@@ -2650,6 +2973,20 @@ class ControlUnit6502Behavioral(py4hw.Logic):
         control['e_Z'].prepare(0)
         yield
         
+    def aluXOR_MBR(self):
+        control = self.control
+        control['alu_op'].prepare(ALU.OP_XOR)
+        control['alu_sel_MBR'].prepare(1)
+        control['e_A'].prepare(1)
+        control['e_N'].prepare(1)
+        control['e_Z'].prepare(1)
+        yield
+        control['alu_sel_MBR'].prepare(0)
+        control['e_A'].prepare(0)
+        control['e_N'].prepare(0)
+        control['e_Z'].prepare(0)
+        yield
+
     def aluROR_A(self):
         control = self.control
         control['alu_op'].prepare(ALU.OP_ROR)
@@ -3402,12 +3739,20 @@ class ControlUnit6502Behavioral(py4hw.Logic):
             yield from self.executeBNE_REL()
         elif (op == self.OPCODE_BPL_REL):
             yield from self.executeBPL_REL()
+        elif (op == self.OPCODE_BVC_REL):
+            yield from self.executeBVC_REL()
+        elif (op == self.OPCODE_BVS_REL):
+            yield from self.executeBVS_REL()
         elif (op == self.OPCODE_BRK):
             yield from self.executeBRK()
         elif (op == self.OPCODE_CLC):
             yield from  self.executeCLC()
         elif (op == self.OPCODE_CLD):
-            yield from  self.executeCLD()   
+            yield from  self.executeCLD()
+        elif (op == self.OPCODE_CLI):
+            yield from self.executeCLI()
+        elif (op == self.OPCODE_CLV):
+            yield from self.executeCLV()
         elif (op == self.OPCODE_CMP_ABS):
             yield from self.executeCMP_ABS()
         elif (op == self.OPCODE_CMP_ABSX):
@@ -3424,6 +3769,12 @@ class ControlUnit6502Behavioral(py4hw.Logic):
             yield from self.executeCMP_ZP()
         elif (op == self.OPCODE_CMP_ZPX):
             yield from self.executeCMP_ZPX()
+        elif (op == self.OPCODE_CPX_ABS):
+            yield from self.executeCPX_ABS()
+        elif (op == self.OPCODE_CPX_IMM):
+            yield from self.executeCPX_IMM()
+        elif (op == self.OPCODE_CPX_ZP):
+            yield from self.executeCPX_ZP()
         elif (op == self.OPCODE_CPY_ABS):
             yield from self.executeCPY_ABS()
         elif (op == self.OPCODE_CPY_IMM):
@@ -3442,6 +3793,22 @@ class ControlUnit6502Behavioral(py4hw.Logic):
             yield from self.executeDEX()
         elif (op == self.OPCODE_DEY):
             yield from self.executeDEY()
+        elif (op == self.OPCODE_EOR_ABS):
+            yield from self.executeEOR_ABS()
+        elif (op == self.OPCODE_EOR_ABSX):
+            yield from self.executeEOR_ABSX()
+        elif (op == self.OPCODE_EOR_ABSY):
+            yield from self.executeEOR_ABSY()
+        elif (op == self.OPCODE_EOR_IMM):
+            yield from self.executeEOR_IMM()
+        elif (op == self.OPCODE_EOR_INDX):
+            yield from self.executeEOR_INDX()
+        elif (op == self.OPCODE_EOR_INDY):
+            yield from self.executeEOR_INDY()
+        elif (op == self.OPCODE_EOR_ZP):
+            yield from self.executeEOR_ZP()
+        elif (op == self.OPCODE_EOR_ZPX):
+            yield from self.executeEOR_ZPX()
         elif (op == self.OPCODE_INC_ABS):
             yield from self.executeINC_ABS()
         elif (op == self.OPCODE_INC_ABSX):
@@ -3496,6 +3863,16 @@ class ControlUnit6502Behavioral(py4hw.Logic):
             yield from self.executeLDY_ZP()
         elif (op == self.OPCODE_LDY_ZPX):
             yield from self.executeLDY_ZPX()
+        elif (op == self.OPCODE_LSR_ABS):
+            yield from self.executeLSR_ABS()
+        elif (op == self.OPCODE_LSR_ABSX):
+            yield from self.executeLSR_ABSX()
+        elif (op == self.OPCODE_LSR_ACC):
+            yield from self.executeLSR_ACC()
+        elif (op == self.OPCODE_LSR_ZP):
+            yield from self.executeLSR_ZP()
+        elif (op == self.OPCODE_LSR_ZPX):
+            yield from self.executeLSR_ZPX()
         elif (op == self.OPCODE_ORA_ABS):
             yield from self.executeORA_ABS()
         elif (op == self.OPCODE_ORA_ABSX):
@@ -3552,6 +3929,8 @@ class ControlUnit6502Behavioral(py4hw.Logic):
             yield from self.executeSEC()
         elif (op == self.OPCODE_SED):
             yield from self.executeSED()
+        elif (op == self.OPCODE_SEI):
+            yield from self.executeSEI()
         elif (op == self.OPCODE_STA_ABS):
             yield from self.executeSTA_ABS()
         elif (op == self.OPCODE_STA_ABSX):
