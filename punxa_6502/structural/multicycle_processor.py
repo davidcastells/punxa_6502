@@ -9,7 +9,7 @@ import punxa_6502
 from punxa_6502.structural.alu import ALU
 #from alu import ALUBehavioral
 from punxa_6502.structural.alu import ALUStructural
-
+from .microcoding import MicrocodedControlUnit6502
    
         
 class DataPathStructural(py4hw.Logic):
@@ -238,11 +238,13 @@ class MultiCycle6502(py4hw.Logic):
         control['mem_write'] = memory.write
         
         DataPathStructural(self, 'datapath', reset, resetAddress, memory.address, memory.write_data, memory.be, memory.read_data, status, control)
-        ControlUnit6502Behavioral(self, 'control', reset, status, control)
+        #ControlUnit6502Behavioral(self, 'control', reset, status, control)
+        MicrocodedControlUnit6502(self, 'control', reset, status, control)
         
         self.symbols = {}
         self.control = control
         self.status = status
+        
         
     def loadSymbols(self, symbols):
          self.symbols = symbols
