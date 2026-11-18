@@ -1,9 +1,14 @@
 # punxa_6502
-A 6502 system emulator in py4hw
+A 6502 system emulator in py4hw.
+It supports various models in different py4hw design styles.
 
-## Design
+## Algorithmic single cycle model
+An algorithmic model (using coroutines) is used to provide a golden model of the processor that uses a single cycle to
+execute the instructions, although it models memory accesses with multiple cycles.
 
-6502 is implemented as a multicyle processor.
+## Structural Datapath Design
+
+The 6502 is also implemented as a multicyle processor.
 The datapath is depicted by the following figure.
 
 ![Multicycle Datapath](docs/multicycle_datapath.png)
