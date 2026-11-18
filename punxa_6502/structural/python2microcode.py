@@ -94,8 +94,9 @@ class GroupCycles(ast.NodeTransformer):
             elif isinstance(s, ast.Expr) and isinstance(s.value, ast.YieldFrom):
                 call = s.value.value
                 if call.args: 
-                    raise NotImplementedError(f'line {s.lineno}: call with arguments ')
-                if pend: raise NotImplementedError(f'line {s.lineno}: writes before call')
+                    raise NotImplementedError(f'line {s.lineno}: call with arguments: {ast.unparse(s)}')
+                if pend: 
+                    raise NotImplementedError(f'line {s.lineno}: writes before call: {ast.unparse(s)}')
                 out.append(CallMicro(call.func.attr))
             elif (pc := prepare_call(s)):
                 k, arg = pc
