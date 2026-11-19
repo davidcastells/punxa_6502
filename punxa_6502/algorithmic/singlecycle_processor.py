@@ -299,12 +299,30 @@ class SingleCycle6502(py4hw.Logic):
                 print(f'BCC {w:3} \t--> (C={self.C}) pc={self.pc:04X}' )
             else:
                 print(f'BCC {w:3} \t--> (C={self.C})' )
+        elif (op == 'BCS'):
+            if (self.C):
+                self.pc += w
+                print(f'BCS {w:3} \t--> (C={self.C}) pc={self.pc:04X}' )
+            else:
+                print(f'BCS {w:3} \t--> (C={self.C})' )
         elif (op == 'BEQ'):
             if (self.Z):
                 self.pc += w
                 print(f'BEQ {w:3} \t--> (Z={self.Z}) pc={self.pc:04X}' )
             else:
                 print(f'BEQ {w:3} \t--> (Z={self.Z})' )
+        elif (op == 'BIT'):
+            # N and V are copied from the operand; Z tests A & M; A is not written
+            self.N = (w >> 7) & 1
+            self.V = (w >> 6) & 1
+            self.Z = ((self.A & w) == 0) & 1
+            print(f'BIT {ws} \t--> {ms}N={self.N} V={self.V} Z={self.Z}')
+        elif (op == 'BMI'):
+            if (self.N):
+                self.pc += w
+                print(f'BMI {w:3} \t--> (N={self.N}) pc={self.pc:04X}' )
+            else:
+                print(f'BMI {w:3} \t--> (N={self.N})' )
         elif (op == 'BNE'):
             if (self.Z == 0):
                 self.pc += w
@@ -452,11 +470,30 @@ class SingleCycle6502(py4hw.Logic):
                 self.Z = (R == 0) & 1
                 yield from self.memoryWrite(add, R)
                 print(f'LSR {ws} \t--> {ms} [{add:04X}]={R:02X} C={self.C} N={self.N} Z={self.Z}')
+        elif (op == 'NOP'):
+            # No operation: fetch() already moved the PC past the opcode
+            print('NOP \t\t-->')
         elif (op == 'ORA'):
             self.A = self.A | w
             self.N = self.A >> 7
             self.Z = (self.A == 0) & 1
             print(f'ORA {ws} \t--> {ms}A={self.A:02X} N={self.N} Z={self.Z}')
+        elif (op == 'ROL'):
+            pC = self.C
+            if (addressing == punxa_6502.ADDRESSING_ACCUMULATOR):
+                self.C = (self.A >> 7) & 1
+                self.A = ((self.A << 1) | pC) & 0xFF
+                self.N = (self.A >> 7) & 1
+                self.Z = (self.A == 0) & 1
+                print(f'ROL {ws} \t--> A={self.A:02X} C={self.C} N={self.N} Z={self.Z}')
+            else:
+                # Memory addressing modes (ZeroPage, Absolute, ZeroPage,X, Absolute,X)
+                self.C = (w >> 7) & 1
+                R = ((w << 1) | pC) & 0xFF
+                self.N = (R >> 7) & 1
+                self.Z = (R == 0) & 1
+                yield from self.memoryWrite(add, R)
+                print(f'ROL {ws} \t--> {ms} [{add:04X}]={R:02X} C={self.C} N={self.N} Z={self.Z}')
         elif (op == 'ROR'):
             pC = self.C
             if (addressing == punxa_6502.ADDRESSING_ACCUMULATOR):
@@ -585,6 +622,17 @@ class SingleCycle6502(py4hw.Logic):
             self.Z = (self.A == 0) & 1
             print(f'PLA \t\t--> [{spa:04X}]={self.A:02X} A={self.A:02X} N={self.N} Z={self.Z} SP={self.SP:02X} ')
             
+        elif (op == 'PLP'):
+            P, spa = yield from self.pop8()
+            # P = N V 1 B D I Z C; bit 5 and B are not stored flags, so they are ignored
+            self.N = (P >> 7) & 1
+            self.V = (P >> 6) & 1
+            self.D = (P >> 3) & 1
+            self.I = (P >> 2) & 1
+            self.Z = (P >> 1) & 1
+            self.C = P & 1
+            print(f'PLP \t\t--> [{spa:04X}]={P:02X} N={self.N} V={self.V} D={self.D} I={self.I} Z={self.Z} C={self.C} SP={self.SP:02X}')
+
         elif (op == 'RTS'):
             self.SP = (self.SP + 1) & 0xFF
             spl = 0x0100 | self.SP
@@ -602,7 +650,8 @@ class SingleCycle6502(py4hw.Logic):
             print(f'RTS \t\t--> SP[{sph:04X}]={rah:02X} SP[{spl:04X}]={ral:02X} pc={self.pc:04X}')
             
         else:
-            print('UNHANDLED', self.decoded_ins, self.decoded_addressing)
+            # Fail loudly, like MultiCycle6502: an ignored opcode would act as a NOP
+            raise Exception(f'op {self.ins:02X} not handled ({self.decoded_ins} {self.decoded_addressing})')
             
         yield
 
