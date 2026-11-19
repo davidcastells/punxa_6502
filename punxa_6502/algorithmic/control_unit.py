@@ -1050,6 +1050,17 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         w = py4hw.IntegerHelper.c2_to_signed(w, 8)
         print(f'\t\tBCC {w:3} \t--> (C={c})')
         
+    def executeBCS_REL(self):
+        yield from self.incPC()
+        yield from self.fetchMBR()         # signed offset -> MBR
+        yield from self.incPC()            # PC now points to the next instruction
+        c = self.status['q_C'].get()
+        if (c):
+            yield from self.addMBR_to_PC() # PC = PC + signed offset
+        w = self.parent.children['datapath']._wires['q_MBR'].get()
+        w = py4hw.IntegerHelper.c2_to_signed(w, 8)
+        print(f'\t\tBCS {w:3} \t--> (C={c})')
+
     def executeBEQ_REL(self):
         yield from self.incPC()
         yield from self.fetchMBR()
@@ -1066,6 +1077,46 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         w = self.parent.children['datapath']._wires['q_MBR'].get()
         w = py4hw.IntegerHelper.c2_to_signed(w, 8)
         print(f'\t\tBEQ {w:3} \t--> (Z={z})' )
+
+    def executeBIT_ABS(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()      # address low byte -> MAR_lo
+        yield from self.incPC()
+        yield from self.fetchMAR_hi()      # address high byte -> MAR_hi
+        a = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        b = self.parent.children['datapath']._wires['q_MAR_hi'].get()
+        yield from self.fetchMAR_MBR()     # M = mem[MAR] -> MBR
+        yield from self.aluBIT_MBR()       # Z = (A & M) == 0, N = M7, V = M6; A unchanged
+        yield from self.incPC()
+        m = self.parent.children['datapath']._wires['q_MBR'].get()
+        n = self.status['q_N'].get()
+        v = self.status['q_V'].get()
+        z = self.status['q_Z'].get()
+        print(f'\tBIT ${b:02X}{a:02X} = {m:02X} \t--> N={n} V={v} Z={z}')
+
+    def executeBIT_ZP(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()      # zero-page address -> MAR_lo
+        yield from self.fetchZP_MBR()      # M = mem[0x00:MAR_lo] -> MBR
+        yield from self.aluBIT_MBR()       # Z = (A & M) == 0, N = M7, V = M6; A unchanged
+        yield from self.incPC()
+        a = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        m = self.parent.children['datapath']._wires['q_MBR'].get()
+        n = self.status['q_N'].get()
+        v = self.status['q_V'].get()
+        z = self.status['q_Z'].get()
+        print(f'\t\tBIT ${a:02X} = {m:02X} \t--> N={n} V={v} Z={z}')
+
+    def executeBMI_REL(self):
+        yield from self.incPC()
+        yield from self.fetchMBR()         # signed offset -> MBR
+        yield from self.incPC()            # PC now points to the next instruction
+        n = self.status['q_N'].get()
+        if (n):
+            yield from self.addMBR_to_PC() # PC = PC + signed offset
+        w = self.parent.children['datapath']._wires['q_MBR'].get()
+        w = py4hw.IntegerHelper.c2_to_signed(w, 8)
+        print(f'\t\tBMI {w:3} \t--> (N={n})')
 
     def executeBNE_REL(self):
         yield from self.incPC()
@@ -1898,7 +1949,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield from self.pushA()                # save A on the stack (MAR still holds the address)
         yield from self.fetchMAR_MBR()         # M = mem[MAR] -> MBR
         yield from self.transferMBR_to_A()     # A = M
-        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.clearC()               # shift a 0 into bit 7
         yield from self.aluROR_A()             # A = {0, M[7:1]}, C = old M[0], N = 0, update Z
         r = self.parent.children['datapath']._wires['q_A'].get()
         yield from self.storeA()               # mem[MAR] = A
@@ -1920,7 +1971,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield from self.pushA()                # save A on the stack (MAR still holds the address)
         yield from self.fetchMAR_MBR()         # M = mem[MAR] -> MBR
         yield from self.transferMBR_to_A()     # A = M
-        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.clearC()               # shift a 0 into bit 7
         yield from self.aluROR_A()             # A = {0, M[7:1]}, C = old M[0], N = 0, update Z
         r = self.parent.children['datapath']._wires['q_A'].get()
         yield from self.storeA()               # mem[MAR] = A
@@ -1932,7 +1983,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         print(f'\tLSR ${b:02X}{a:02X},X \t--> M={r:02X} C={c} N={n} Z={z}')
 
     def executeLSR_ACC(self):
-        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.clearC()               # shift a 0 into bit 7
         yield from self.aluROR_A()             # A = {0, A[7:1]}, C = old A[0], N = 0, update Z
         yield from self.incPC()
         a = self.parent.children['datapath']._wires['q_A'].get()
@@ -1947,7 +1998,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         m = self.parent.children['datapath']._wires['q_MAR_lo'].get()
         yield from self.transferA_to_MAR_hi()  # park A (MAR_hi is unused in zero page)
         yield from self.fetchZP_A()            # A = M
-        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.clearC()               # shift a 0 into bit 7
         yield from self.aluROR_A()             # A = {0, M[7:1]}, C = old M[0], N = 0, update Z
         r = self.parent.children['datapath']._wires['q_A'].get()
         yield from self.storeA_ZP()            # mem[0x00:MAR_lo] = A
@@ -1965,7 +2016,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield from self.addX_to_MAR()          # MAR_lo = (base + X) & 0xFF, A is preserved
         yield from self.transferA_to_MAR_hi()  # park A (MAR_hi is unused in zero page)
         yield from self.fetchZP_A()            # A = M
-        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.clearC()               # shift a 0 into bit 7
         yield from self.aluROR_A()             # A = {0, M[7:1]}, C = old M[0], N = 0, update Z
         r = self.parent.children['datapath']._wires['q_A'].get()
         yield from self.storeA_ZP()            # mem[0x00:MAR_lo] = A
@@ -2008,6 +2059,10 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield from self.transferMAR_to_PC()
         pc = self.parent.children['datapath']._wires['q_PC'].get()
         print(f'\tJSR {pc:04X} ')
+
+    def executeNOP(self):
+        yield from self.incPC()            # only the PC changes: PC = PC + 1
+        print(f'\t\tNOP')
 
     def executeORA_ABS(self):
         yield from self.incPC()
@@ -2155,6 +2210,95 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         z = self.status['q_Z'].get()
         n = self.status['q_N'].get()
         print(f'\t\t\tPLA\t\t--> A={a:02X} N={n} Z={z}')
+
+    def executePLP(self):
+        yield from self.popMBR()           # SP = SP + 1, MBR = mem[$0100+SP]
+        yield from self.restoreFlags()     # C Z I D V N <- MBR bits (B and bit 5 ignored)
+        yield from self.incPC()
+        p = self.parent.children['datapath']._wires['q_P'].get()
+        sp = self.parent.children['datapath']._wires['q_SP'].get()
+        print(f'\t\tPLP\t\t--> P={p:02X} SP={sp:02X}')
+
+    def executeROL_ABS(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()          # address low byte -> MAR_lo
+        yield from self.incPC()
+        yield from self.fetchMAR_hi()          # address high byte -> MAR_hi
+        a = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        b = self.parent.children['datapath']._wires['q_MAR_hi'].get()
+        yield from self.transferA_to_MBR()     # park A in MBR (internal; no stack or memory access)
+        yield from self.fetchMAR_A()           # A = M = mem[MAR]
+        yield from self.aluROL_A()             # A = {M[6:0], C}, C = old M[7], update N and Z
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        yield from self.storeA()               # mem[MAR] = A
+        yield from self.transferMBR_to_A()     # restore the real A
+        yield from self.incPC()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'	ROL ${b:02X}{a:02X} 	--> M={r:02X} C={c} N={n} Z={z}')
+
+    def executeROL_ABSX(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()          # base address low byte -> MAR_lo
+        yield from self.incPC()
+        yield from self.fetchMAR_hi()          # base address high byte -> MAR_hi
+        a = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        b = self.parent.children['datapath']._wires['q_MAR_hi'].get()
+        yield from self.addX_to_MAR()          # MAR = base + X (carry into MAR_hi), A is preserved
+        yield from self.transferA_to_MBR()     # park A in MBR (internal; no stack or memory access)
+        yield from self.fetchMAR_A()           # A = M = mem[MAR]
+        yield from self.aluROL_A()             # A = {M[6:0], C}, C = old M[7], update N and Z
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        yield from self.storeA()               # mem[MAR] = A
+        yield from self.transferMBR_to_A()     # restore the real A
+        yield from self.incPC()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'	ROL ${b:02X}{a:02X},X 	--> M={r:02X} C={c} N={n} Z={z}')
+
+    def executeROL_ACC(self):
+        yield from self.aluROL_A()
+        yield from self.incPC()
+        a = self.parent.children['datapath']._wires['q_A'].get()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'			ROL A		--> A={a:02X} C={c} N={n} Z={z}')
+
+    def executeROL_ZP(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()          # zero-page address -> MAR_lo
+        m = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        yield from self.transferA_to_MAR_hi()  # park A (MAR_hi is unused in zero page)
+        yield from self.fetchZP_A()            # A = M
+        yield from self.aluROL_A()             # A = {M[6:0], C}, C = old M[7], update N and Z
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        yield from self.storeA_ZP()            # mem[0x00:MAR_lo] = A
+        yield from self.transferMAR_hi_to_A()  # restore the real A
+        yield from self.incPC()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'		ROL ${m:02X} 	--> M={r:02X} C={c} N={n} Z={z}')
+
+    def executeROL_ZPX(self):
+        yield from self.incPC()
+        yield from self.fetchMAR_lo()          # base zero-page address -> MAR_lo
+        m = self.parent.children['datapath']._wires['q_MAR_lo'].get()
+        yield from self.addX_to_MAR()          # MAR_lo = (base + X) & 0xFF, A is preserved
+        yield from self.transferA_to_MAR_hi()  # park A (MAR_hi is unused in zero page)
+        yield from self.fetchZP_A()            # A = M
+        yield from self.aluROL_A()             # A = {M[6:0], C}, C = old M[7], update N and Z
+        r = self.parent.children['datapath']._wires['q_A'].get()
+        yield from self.storeA_ZP()            # mem[0x00:MAR_lo] = A
+        yield from self.transferMAR_hi_to_A()  # restore the real A
+        yield from self.incPC()
+        c = self.status['q_C'].get()
+        z = self.status['q_Z'].get()
+        n = self.status['q_N'].get()
+        print(f'		ROL ${m:02X},X 	--> M={r:02X} C={c} N={n} Z={z}')
 
     def executeROR_ABS(self):
         yield from self.incPC()
@@ -2685,6 +2829,26 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         control['e_Z'].prepare(0)
         yield
         
+    def aluBIT_MBR(self):
+        control = self.control
+        # cycle 1: Z from the ALU result A & M; e_A stays 0, so A is not written
+        control['alu_op'].prepare(ALU.OP_AND)
+        control['alu_sel_MBR'].prepare(1)
+        control['e_Z'].prepare(1)
+        yield
+        # cycle 2: N = MBR bit 7, V = MBR bit 6 through the sel_flags muxes
+        control['alu_op'].prepare(ALU.OP_BYPASS)
+        control['alu_sel_MBR'].prepare(0)
+        control['e_Z'].prepare(0)
+        control['sel_flags'].prepare(1)
+        control['e_N'].prepare(1)
+        control['e_V'].prepare(1)
+        yield
+        control['sel_flags'].prepare(0)
+        control['e_N'].prepare(0)
+        control['e_V'].prepare(0)
+        yield
+
     def aluOR_MBR(self):
         control = self.control
         control['alu_op'].prepare(ALU.OP_OR)
@@ -2709,6 +2873,23 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield
         control['alu_sel_MBR'].prepare(0)
         control['e_A'].prepare(0)
+        control['e_N'].prepare(0)
+        control['e_Z'].prepare(0)
+        yield
+
+    def aluROL_A(self):
+        control = self.control
+        control['alu_op'].prepare(ALU.OP_ADD)  # A + A + C = (A << 1) | C, carry out = old bit 7
+        control['alu_sel_A'].prepare(1)
+        control['e_A'].prepare(1)
+        control['e_C'].prepare(1)    # C = old bit 7 (sel_C=0: ALU carry)
+        control['e_N'].prepare(1)
+        control['e_Z'].prepare(1)    # e_V stays 0: OP_ADD computes an overflow that ROL must not keep
+        yield
+        control['alu_op'].prepare(ALU.OP_BYPASS)
+        control['alu_sel_A'].prepare(0)
+        control['e_A'].prepare(0)
+        control['e_C'].prepare(0)
         control['e_N'].prepare(0)
         control['e_Z'].prepare(0)
         yield
@@ -2964,9 +3145,11 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield
     
         
-    def setC(self, value):
+    def clearC(self):
+        # No argument and a constant d_C: python2microcode only accepts
+        # argument-free calls and constant prepare() values
         control = self.control
-        control['d_C'].prepare(value)
+        control['d_C'].prepare(0)
         control['sel_C'].prepare(1)      # take the value from the CU, not the ALU
         control['e_C'].prepare(1)
         yield
@@ -3459,8 +3642,16 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
             yield from self.executeASL_ZPX()
         elif (op == self.OPCODE_BCC_REL):
             yield from self.executeBCC_REL()   
+        elif (op == self.OPCODE_BCS_REL):
+            yield from self.executeBCS_REL()
         elif (op == self.OPCODE_BEQ_REL):
             yield from self.executeBEQ_REL()
+        elif (op == self.OPCODE_BIT_ABS):
+            yield from self.executeBIT_ABS()
+        elif (op == self.OPCODE_BIT_ZP):
+            yield from self.executeBIT_ZP()
+        elif (op == self.OPCODE_BMI_REL):
+            yield from self.executeBMI_REL()
         elif (op == self.OPCODE_BNE_REL):
             yield from self.executeBNE_REL()
         elif (op == self.OPCODE_BPL_REL):
@@ -3599,6 +3790,8 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
             yield from self.executeLSR_ZP()
         elif (op == self.OPCODE_LSR_ZPX):
             yield from self.executeLSR_ZPX()
+        elif (op == self.OPCODE_NOP):
+            yield from self.executeNOP()
         elif (op == self.OPCODE_ORA_ABS):
             yield from self.executeORA_ABS()
         elif (op == self.OPCODE_ORA_ABSX):
@@ -3621,6 +3814,18 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
             yield from self.executePHP()
         elif (op == self.OPCODE_PLA):
             yield from self.executePLA()
+        elif (op == self.OPCODE_PLP):
+            yield from self.executePLP()
+        elif (op == self.OPCODE_ROL_ABS):
+            yield from self.executeROL_ABS()
+        elif (op == self.OPCODE_ROL_ABSX):
+            yield from self.executeROL_ABSX()
+        elif (op == self.OPCODE_ROL_ACC):
+            yield from self.executeROL_ACC()
+        elif (op == self.OPCODE_ROL_ZP):
+            yield from self.executeROL_ZP()
+        elif (op == self.OPCODE_ROL_ZPX):
+            yield from self.executeROL_ZPX()
         elif (op == self.OPCODE_ROR_ABS):
             yield from self.executeROR_ABS()
         elif (op == self.OPCODE_ROR_ABSX):
