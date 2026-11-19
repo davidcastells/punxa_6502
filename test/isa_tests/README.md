@@ -185,7 +185,5 @@ python tb_ISA_tests_Multicycle.py -c "runAllTests()"
 ## More information
 
 - [COVERAGE.md](COVERAGE.md): what each test checks, untested instructions and known issues.
-- [test_plp_stack_pointer.py](test_plp_stack_pointer.py): checks the SP register right after PLP on the
-  SingleCycle and Hybrid models (`python -m pytest test_plp_stack_pointer.py`).
 - When redirecting the output to a file, use `python -u`: the runners end with `os._exit(0)`, which
   discards buffered output. On Windows, also set `PYTHONIOENCODING=utf-8` to print the progress bars.
