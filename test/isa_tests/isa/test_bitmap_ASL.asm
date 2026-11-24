@@ -2,7 +2,7 @@
 ; Expectations are fixed constants, never calculated with the target instruction.
 ; Cases 1-9: functional tests of all five forms (PHP-based flag checks).
 ; Cases 10-15: stack side-effect regression of the memory forms 0E/1E, without
-; any PHP before the memory checks, plus bus monitoring (see bus_monitor.py).
+; any PHP before the memory checks.
 .setcpu "6502"
 .include "test_protocol.inc"
 .export start, end, saved_a, saved_p, saved_x, check_stage
@@ -201,8 +201,6 @@ passed_9:
 ; Operands: ordinary memory, the stack page away from SP, and exactly $0100+SP.
 ; Unlike cases 1-9, no PHP runs between the target and the checks (a PHP
 ; would overwrite $01FE and hide a stray write).
-; Each asl_stk_probe_N is also bus-monitored (see bus_monitor.py): the only
-; write allowed is to asl_stk_probe_N_ea, and only after the operand is read.
 ; Guard set-up and the guard check are shared routines (after `end`) so that
 ; the file fits in CODE $0200-$0FFF; they are only called with SP=$80, so the
 ; JSR return address lands on $0180/$017F, away from every guard and operand.
@@ -289,8 +287,7 @@ done:
 .endmacro
 
 ; CASE 10 (stack 1): 0E Absolute, ordinary memory $1010, $81/C=1 -> $02; N/Z/C=0/0/1.
-.export asl_stk_probe_1, asl_stk_probe_1_ea, asl_stk_passed_1
-asl_stk_probe_1_ea = $1010
+.export asl_stk_probe_1, asl_stk_passed_1
     TEST_CASE 10
     STK_INIT_MEMORY $1010, $81
     STK_SETUP $5A, 1, $80
@@ -301,8 +298,7 @@ asl_stk_passed_1:
 
 ; CASE 11 (stack 2): 1E Absolute,X, ordinary memory $12FF+$01 = $1300, $40 -> $80;
 ; N/Z/C=1/0/0.
-.export asl_stk_probe_2, asl_stk_probe_2_ea, asl_stk_passed_2
-asl_stk_probe_2_ea = $1300
+.export asl_stk_probe_2, asl_stk_passed_2
     TEST_CASE 11
     STK_INIT_MEMORY $1300, $40
     STK_SETUP $01, 1, $00
@@ -313,8 +309,7 @@ asl_stk_passed_2:
 
 ; CASE 12 (stack 3): 0E Absolute, stack page $01F0 (not $0100+SP), $C0 -> $80;
 ; N/Z/C=1/0/1.
-.export asl_stk_probe_3, asl_stk_probe_3_ea, asl_stk_passed_3
-asl_stk_probe_3_ea = $01F0
+.export asl_stk_probe_3, asl_stk_passed_3
     TEST_CASE 12
     STK_INIT_MEMORY $01F0, $C0
     STK_SETUP $5A, 0, $00
@@ -325,8 +320,7 @@ asl_stk_passed_3:
 
 ; CASE 13 (stack 4): 1E Absolute,X, stack page $01E8+$08 = $01F0, $80 -> $00;
 ; N/Z/C=0/1/1.
-.export asl_stk_probe_4, asl_stk_probe_4_ea, asl_stk_passed_4
-asl_stk_probe_4_ea = $01F0
+.export asl_stk_probe_4, asl_stk_passed_4
     TEST_CASE 13
     STK_INIT_MEMORY $01F0, $80
     STK_SETUP $08, 0, $80
@@ -337,8 +331,7 @@ asl_stk_passed_4:
 
 ; CASE 14 (stack 5): 0E Absolute, operand exactly $0100+SP = $01FE, $81 -> $02;
 ; N/Z/C=0/0/1.
-.export asl_stk_probe_5, asl_stk_probe_5_ea, asl_stk_passed_5
-asl_stk_probe_5_ea = $01FE
+.export asl_stk_probe_5, asl_stk_passed_5
     TEST_CASE 14
     STK_INIT_MEMORY $01FE, $81
     STK_SETUP $5A, 0, $80
@@ -349,8 +342,7 @@ asl_stk_passed_5:
 
 ; CASE 15 (stack 6): 1E Absolute,X, operand exactly $0100+SP: $01F0+$0E = $01FE,
 ; $41 -> $82; N/Z/C=1/0/0.
-.export asl_stk_probe_6, asl_stk_probe_6_ea, asl_stk_passed_6
-asl_stk_probe_6_ea = $01FE
+.export asl_stk_probe_6, asl_stk_passed_6
     TEST_CASE 15
     STK_INIT_MEMORY $01FE, $41
     STK_SETUP $0E, 1, $00

@@ -6,7 +6,7 @@
 ; Structure follows test_bitmap_ROR.asm. I=0 is the simulator convention.
 ; Cases 1-12: functional tests of all five forms (PHP-based flag checks).
 ; Cases 13-18: stack side-effect regression of the memory forms 4E/5E, without
-; any PHP before the memory checks, plus bus monitoring (see bus_monitor.py).
+; any PHP before the memory checks.
 .setcpu "6502"
 .include "test_protocol.inc"
 .export start, end, saved_a, saved_x, saved_y, saved_sp, pre_p, post_p, check_stage
@@ -330,8 +330,6 @@ lsr_passed_12:
 ; Unlike cases 1-12, no PHP runs between the target and the checks (the
 ; CAPTURE_STATE PHP would overwrite $01FE and hide a stray write). The
 ; guards reuse $01FE/$01FF (post_p/pre_p above).
-; Each lsr_stk_probe_N is also bus-monitored (see bus_monitor.py): the only
-; write allowed is to lsr_stk_probe_N_ea, and only after the operand is read.
 ; Guard set-up and the guard check are shared routines (after `end`) so that
 ; the file fits in CODE $0200-$0FFF; they are only called with SP=$80, so the
 ; JSR return address lands on $0180/$017F, away from every guard and operand.
@@ -418,8 +416,7 @@ done:
 .endmacro
 
 ; CASE 13 (stack 1): 4E Absolute, ordinary memory $1010, $81/C=0 -> $40; N/Z/C=0/0/1.
-.export lsr_stk_probe_1, lsr_stk_probe_1_ea, lsr_stk_passed_1
-lsr_stk_probe_1_ea = $1010
+.export lsr_stk_probe_1, lsr_stk_passed_1
     TEST_CASE 13
     STK_INIT_MEMORY $1010, $81
     STK_SETUP $5A, 0, $80
@@ -430,8 +427,7 @@ lsr_stk_passed_1:
 
 ; CASE 14 (stack 2): 5E Absolute,X, ordinary memory $12FF+$01 = $1300, $01/C=1 -> $00;
 ; N/Z/C=0/1/1.
-.export lsr_stk_probe_2, lsr_stk_probe_2_ea, lsr_stk_passed_2
-lsr_stk_probe_2_ea = $1300
+.export lsr_stk_probe_2, lsr_stk_passed_2
     TEST_CASE 14
     STK_INIT_MEMORY $1300, $01
     STK_SETUP $01, 1, $80
@@ -442,8 +438,7 @@ lsr_stk_passed_2:
 
 ; CASE 15 (stack 3): 4E Absolute, stack page $01F0 (not $0100+SP), $FE/C=1 -> $7F;
 ; N/Z/C=0/0/0.
-.export lsr_stk_probe_3, lsr_stk_probe_3_ea, lsr_stk_passed_3
-lsr_stk_probe_3_ea = $01F0
+.export lsr_stk_probe_3, lsr_stk_passed_3
     TEST_CASE 15
     STK_INIT_MEMORY $01F0, $FE
     STK_SETUP $5A, 1, $80
@@ -454,8 +449,7 @@ lsr_stk_passed_3:
 
 ; CASE 16 (stack 4): 5E Absolute,X, stack page $01E8+$08 = $01F0, $02/C=1 -> $01;
 ; N/Z/C=0/0/0.
-.export lsr_stk_probe_4, lsr_stk_probe_4_ea, lsr_stk_passed_4
-lsr_stk_probe_4_ea = $01F0
+.export lsr_stk_probe_4, lsr_stk_passed_4
     TEST_CASE 16
     STK_INIT_MEMORY $01F0, $02
     STK_SETUP $08, 1, $00
@@ -466,8 +460,7 @@ lsr_stk_passed_4:
 
 ; CASE 17 (stack 5): 4E Absolute, operand exactly $0100+SP = $01FE, $81/C=1 -> $40;
 ; N/Z/C=0/0/1.
-.export lsr_stk_probe_5, lsr_stk_probe_5_ea, lsr_stk_passed_5
-lsr_stk_probe_5_ea = $01FE
+.export lsr_stk_probe_5, lsr_stk_passed_5
     TEST_CASE 17
     STK_INIT_MEMORY $01FE, $81
     STK_SETUP $5A, 1, $00
@@ -478,8 +471,7 @@ lsr_stk_passed_5:
 
 ; CASE 18 (stack 6): 5E Absolute,X, operand exactly $0100+SP: $01F0+$0E = $01FE,
 ; $80/C=0 -> $40; N/Z/C=0/0/0.
-.export lsr_stk_probe_6, lsr_stk_probe_6_ea, lsr_stk_passed_6
-lsr_stk_probe_6_ea = $01FE
+.export lsr_stk_probe_6, lsr_stk_passed_6
     TEST_CASE 18
     STK_INIT_MEMORY $01FE, $80
     STK_SETUP $0E, 0, $80

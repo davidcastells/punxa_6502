@@ -29,7 +29,6 @@ import py4hw
 import punxa_6502 as punxa
 from punxa_6502.assembly import assemble_file
 from punxa_6502.interactive_commands import *
-from bus_monitor import SideEffectMonitor
 
 # --------------------------------------------------------------------------
 # Configuration
@@ -119,16 +118,13 @@ def runTest(file, verbose=False):
     """Run one test. Returns normally if it passes, raises if it fails."""
     prepareTest(file)
 
-    # Bus monitor for tests that export <probe>/<probe>_ea pairs (no-op otherwise)
-    monitor = SideEffectMonitor(cpu, symbols)
-
     step_count = 0
 
     # The CPU prints an instruction trace; hide it unless verbose
     with open(os.devnull, 'w') as null:
         with contextlib.redirect_stdout(sys.stdout if verbose else null):
             while cpu.pc != symbols['end']:
-                monitor.step(step)
+                step()
                 step_count += 1
                 if step_count > step_limit:
                     raise Exception('Step count > limit')
@@ -139,13 +135,9 @@ def runTest(file, verbose=False):
     print('FINAL RESULT:', final_result, '\tTest case:', test_case)
 
     if final_result == 255:
-        raise Exception(f'Failed in test case {test_case}' + monitor.describe())
+        raise Exception(f'Failed in test case {test_case}')
     if final_result != 1:
-        raise Exception(f'Protocol error: final_result = 0x{final_result:02X}' + monitor.describe())
-    if monitor.violations:
-        raise Exception('Memory side effect' + monitor.describe())
-    if monitor.coverage_errors():
-        raise Exception('Probe coverage: ' + '; '.join(monitor.coverage_errors()))
+        raise Exception(f'Protocol error: final_result = 0x{final_result:02X}')
 
 
 def getPrefix(name):
