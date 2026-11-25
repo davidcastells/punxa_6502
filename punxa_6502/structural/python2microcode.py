@@ -142,7 +142,8 @@ class Python2SequencerROM:
         '''
         self.cw = control_widths
         #self.cw['finish_dispatch'] = 1
-        self.layout, lsb = {}, 0
+        self.layout = {}
+        lsb = 0
         
         for k, w in self.cw.items():
             self.layout[k] = (lsb, w)
@@ -153,6 +154,7 @@ class Python2SequencerROM:
         self.addr_width = addr_width
         self.nac = max(lsb, addr_width)
         
+        print('Number of address bits or control bits:', nac)
         assert(nsw == self.nsw)
         assert(nac == self.nac)
         
@@ -214,7 +216,9 @@ class Python2SequencerROM:
         todo = list(set(self.table.values())) + [self.fetch]
         while todo:
             m = todo.pop()
-            if m in self.bodies: continue
+            if m in self.bodies: 
+                continue
+            
             self.bodies[m] = self._transform(m)
             todo += [c.target for s in self.bodies[m] for c in ast.walk(s)
                      if isinstance(c, CallMicro)]
@@ -230,10 +234,16 @@ class Python2SequencerROM:
             self.warnings.append(f'signals not in layout: {u}')
 
         # ----- back end -----
-        self.lines, self.pending, self.nlabel = [], [], 0
+        self.lines = []
+        self.pending = []
+        self.nlabel = 0
+        
         for op in range(256):                 # dispatch table at 0..255
-            if op == 0: self.pending.append('TABLE')
+            if op == 0:
+                self.pending.append('TABLE')
+                
             self._add('JMP', target=self.table.get(op, 'JAM'))
+        
         self.pending.append('JAM')
         self._add('JMP', target='JAM')
         self._routine(self.fetch, 'fetch')
@@ -315,7 +325,8 @@ class Python2SequencerROM:
         if ln['ins'] == 'EXE':
             for k, v in ln['ctrl'].items():
                 if k in self.layout:
-                    lsb, wd = self.layout[k]; w |= (v & ((1 << wd) - 1)) << lsb
+                    lsb, wd = self.layout[k]
+                    w |= (v & ((1 << wd) - 1)) << lsb
         else:
             w |= ln.get('addr', 0)
         return w
@@ -325,7 +336,16 @@ class Python2SequencerROM:
 
             
     def listing(self):
+        '''
+        Prints the listing of the program.
+
+        Returns
+        -------
+        None
+        '''
+        
         for i, l in enumerate(self.lines):
+            
             ctrl = {k: v for k, v in l.get('ctrl', {}).items() if v != self.baseline.get(k)}
             target = ''
             if l.get('target'):
