@@ -1,50 +1,189 @@
-# 6502 ISA tests
+# Testing 6502 ISA
 
-Self-checking assembly tests for the punxa 6502 processor models, in the style
-of the RISC-V ISA tests. Each file in [isa/](isa/) tests one instruction
-(47 files). The files are assembled with our own assembler, so no external
-tools are needed.
+We implemented some instruction tests in assembler in a similar way that RISC-V ISA tests are implemented (and was done in Punxa to verify the repertory).
 
-Every test uses the shared protocol in [test_protocol.inc](isa/test_protocol.inc):
-`test_case` holds the number of the case being checked, and `final_result` is
-`1` when all cases pass or `255` when one fails.
+In punxa_6502 we provide assembler source code that we assemble with our own assembler to avoid unnecessary external dependencies.
 
-## Running the tests
+## Single cycle algorithmic design
 
-Run these commands from this folder (`test/isa_tests`).
+This model is the behavioral model described with the algorithmic py4hw design style, which currently is not synthesizable.
 
-| Model | Whole suite |
-| --- | --- |
-| SingleCycle (algorithmic, not synthesizable) | `python tb_ISA_tests.py -c "runAllTests()"` |
-| MultiCycle (structural datapath, synthesizable) | `python tb_ISA_tests_Multicycle.py -c "runAllTests()"` |
 
-To run one file with an instruction trace:
+To run the tests do
 
 ```
-python tb_ISA_tests_Multicycle.py -c "runTest('test_logic_EOR.asm', verbose=True)"
+python tb_ISA_tests.py -c "runAllTests()"
 ```
 
-If a test fails, the message names the failing case (`Failed in test case N`).
+***Summary***
 
-If you redirect the output to a file or pipe, use `python -u`, because the
-runners exit with `os._exit(0)`, which throws away buffered output. On Windows
-also set `PYTHONIOENCODING=utf-8`, so the progress bars can be printed.
+<pre>
+test_arith      100.0 %  |█████████████████████████████████████████████|
+test_bitmap     100.0 %  |█████████████████████████████████████████████|
+test_ctrflow    100.0 %  |█████████████████████████████████████████████|
+test_data       100.0 %  |█████████████████████████████████████████████|
+test_logic      100.0 %  |█████████████████████████████████████████████|
+test_mcu        100.0 %  |█████████████████████████████████████████████|
+</pre>
 
-## Current results (2026-11-11)
+The detailed current output is:
 
-| Model | Result |
-| --- | --- |
-| SingleCycle | **47/47 PASS** |
-| MultiCycle | **47/47 PASS** |
+```
+Test test_arith_ADC.asm             = OK
+Test test_arith_CMP.asm             = OK
+Test test_arith_CPX.asm             = OK
+Test test_arith_CPY.asm             = OK
+Test test_arith_DEC.asm             = OK
+Test test_arith_DEX.asm             = OK
+Test test_arith_DEY.asm             = OK
+Test test_arith_INC.asm             = OK
+Test test_arith_INX.asm             = OK
+Test test_arith_INY.asm             = OK
+Test test_arith_SBC.asm             = OK
+Test test_bitmap_ASL.asm            = OK
+Test test_bitmap_LSR.asm            = OK
+Test test_bitmap_ROL.asm            = OK
+Test test_bitmap_ROR.asm            = OK
+Test test_ctrflow_BCC.asm           = OK
+Test test_ctrflow_BCS.asm           = OK
+Test test_ctrflow_BEQ.asm           = OK
+Test test_ctrflow_BMI.asm           = OK
+Test test_ctrflow_BNE.asm           = OK
+Test test_ctrflow_BVC.asm           = OK
+Test test_ctrflow_BVS.asm           = OK
+Test test_ctrflow_JMP.asm           = OK
+Test test_ctrflow_JSR.asm           = OK
+Test test_ctrflow_RTS.asm           = OK
+Test test_data_LDA.asm              = OK
+Test test_data_LDX.asm              = OK
+Test test_data_LDY.asm              = OK
+Test test_data_PHA.asm              = OK
+Test test_data_PHP.asm              = OK
+Test test_data_PLA.asm              = OK
+Test test_data_PLP.asm              = OK
+Test test_data_STA.asm              = OK
+Test test_data_STX.asm              = OK
+Test test_data_STY.asm              = OK
+Test test_data_TAX.asm              = OK
+Test test_data_TAY.asm              = OK
+Test test_data_TSX.asm              = OK
+Test test_data_TXA.asm              = OK
+Test test_data_TXS.asm              = OK
+Test test_data_TYA.asm              = OK
+Test test_logic_AND.asm             = OK
+Test test_logic_BIT.asm             = OK
+Test test_logic_EOR.asm             = OK
+Test test_logic_ORA.asm             = OK
+Test test_mcu_CLC.asm               = OK
+Test test_mcu_CLD.asm               = OK
+Test test_mcu_CLI.asm               = OK
+Test test_mcu_CLV.asm               = OK
+Test test_mcu_NOP.asm               = OK
+Test test_mcu_SEC.asm               = OK
+Test test_mcu_SED.asm               = OK
+Test test_mcu_SEI.asm               = OK
+Total: 53 Correct: 53 (100.0 %)
+```
 
-The 47 files contain 405 test cases and cover 137 opcode/addressing-mode
-combinations. Both models run every combination.
+## Multi-cycle hybrid design
+
+This model contains the datapath described with the structural py4hw design style and the control unit
+described with the algorithmic py4hw design style ([control_unit.py](../../punxa_6502/algorithmic/control_unit.py)).
+The datapath is synthesizable.
+
+
+To run the tests do
+
+```
+python tb_ISA_tests_Hybrid.py -c "runAllTests()"
+```
+
+***Summary***
+
+<pre>
+test_arith      100.0 %  |█████████████████████████████████████████████|
+test_bitmap     25.0 %   |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|
+test_ctrflow    100.0 %  |█████████████████████████████████████████████|
+test_data       100.0 %  |█████████████████████████████████████████████|
+test_logic      100.0 %  |█████████████████████████████████████████████|
+test_mcu        100.0 %  |█████████████████████████████████████████████|
+</pre>
+
+The detailed current output is:
+
+```
+Test test_arith_ADC.asm             = OK
+Test test_arith_CMP.asm             = OK
+Test test_arith_CPX.asm             = OK
+Test test_arith_CPY.asm             = OK
+Test test_arith_DEC.asm             = OK
+Test test_arith_DEX.asm             = OK
+Test test_arith_DEY.asm             = OK
+Test test_arith_INC.asm             = OK
+Test test_arith_INX.asm             = OK
+Test test_arith_INY.asm             = OK
+Test test_arith_SBC.asm             = OK
+Test test_bitmap_ASL.asm            = FAILED - Failed in test case 10
+Test test_bitmap_LSR.asm            = FAILED - Failed in test case 13
+Test test_bitmap_ROL.asm            = OK
+Test test_bitmap_ROR.asm            = FAILED - Failed in test case 13
+Test test_ctrflow_BCC.asm           = OK
+Test test_ctrflow_BCS.asm           = OK
+Test test_ctrflow_BEQ.asm           = OK
+Test test_ctrflow_BMI.asm           = OK
+Test test_ctrflow_BNE.asm           = OK
+Test test_ctrflow_BVC.asm           = OK
+Test test_ctrflow_BVS.asm           = OK
+Test test_ctrflow_JMP.asm           = OK
+Test test_ctrflow_JSR.asm           = OK
+Test test_ctrflow_RTS.asm           = OK
+Test test_data_LDA.asm              = OK
+Test test_data_LDX.asm              = OK
+Test test_data_LDY.asm              = OK
+Test test_data_PHA.asm              = OK
+Test test_data_PHP.asm              = OK
+Test test_data_PLA.asm              = OK
+Test test_data_PLP.asm              = OK
+Test test_data_STA.asm              = OK
+Test test_data_STX.asm              = OK
+Test test_data_STY.asm              = OK
+Test test_data_TAX.asm              = OK
+Test test_data_TAY.asm              = OK
+Test test_data_TSX.asm              = OK
+Test test_data_TXA.asm              = OK
+Test test_data_TXS.asm              = OK
+Test test_data_TYA.asm              = OK
+Test test_logic_AND.asm             = OK
+Test test_logic_BIT.asm             = OK
+Test test_logic_EOR.asm             = OK
+Test test_logic_ORA.asm             = OK
+Test test_mcu_CLC.asm               = OK
+Test test_mcu_CLD.asm               = OK
+Test test_mcu_CLI.asm               = OK
+Test test_mcu_CLV.asm               = OK
+Test test_mcu_NOP.asm               = OK
+Test test_mcu_SEC.asm               = OK
+Test test_mcu_SED.asm               = OK
+Test test_mcu_SEI.asm               = OK
+Total: 53 Correct: 50 (94.3 %)
+```
+
+## Multi-cycle microcoded design
+
+This model uses the same structural datapath. Its control unit is a microcode ROM generated from the
+algorithmic control unit.
+
+The ISA tests do not run on this model yet. The runner counts retired instructions with
+`getRetiredInstructions()`, which the microcoded control unit does not provide. No results are reported
+for this model. This is a limitation of the test setup, not a test result (see
+[COVERAGE.md](COVERAGE.md#validation-limitations)).
+
+```
+python tb_ISA_tests_Multicycle.py -c "runAllTests()"
+```
 
 ## More information
 
-- [COVERAGE.md](COVERAGE.md): what each test checks, untested instructions,
-  coverage gaps and known issues.
-- [MULTICYCLE_COMPATIBILITY.md](MULTICYCLE_COMPATIBILITY.md): how the
-  MultiCycle model implements the instructions, and its limitations.
-- [BATCH6_SUMMARY.md](BATCH6_SUMMARY.md) and [LDA_REVIEW.md](LDA_REVIEW.md):
-  historical notes from building the suite.
+- [COVERAGE.md](COVERAGE.md): what each test checks, untested instructions and known issues.
+- When redirecting the output to a file, use `python -u`: the runners end with `os._exit(0)`, which
+  discards buffered output. On Windows, also set `PYTHONIOENCODING=utf-8` to print the progress bars.
