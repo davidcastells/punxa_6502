@@ -173,10 +173,6 @@ Total: 53 Correct: 50 (94.3 %)
 This model uses the same structural datapath. Its control unit is a microcode ROM generated from the
 algorithmic control unit.
 
-The ISA tests do not run on this model yet. The runner counts retired instructions with
-`getRetiredInstructions()`, which the microcoded control unit does not provide. No results are reported
-for this model. This is a limitation of the test setup, not a test result (see
-[COVERAGE.md](COVERAGE.md#validation-limitations)).
 
 ```
 python tb_ISA_tests_Multicycle.py -c "runAllTests()"
