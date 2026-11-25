@@ -37,7 +37,7 @@ ex_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'isa')
 
 PROGRAM_START = 0x0200
 MEMORY_SIZE = 0x10000
-step_limit = 10000          # maximum instructions per test
+step_limit = 1000          # maximum instructions per test
 
 
 # Leave empty to run every test_<group>_*.asm found in isa/.
@@ -69,6 +69,7 @@ def prepareTest(file, useWaveforms=False):
     if PROGRAM_START + len(program.code) > MEMORY_SIZE:
         raise Exception('Program does not fit in memory')
 
+
     hw = py4hw.HWSystem()
 
     reset = hw.wire('reset')
@@ -94,6 +95,7 @@ def prepareTest(file, useWaveforms=False):
     if (useWaveforms):
         watch = py4hw.debug.getInterfaceWires(cpu_port)
         datapath = cpu.children['datapath']
+        control = cpu.children['control']
         watch.extend( py4hw.debug.getPorts(datapath.children['alu']))
         watch.append( datapath._wires['q_PC_lo'])
         watch.append( datapath._wires['q_PC_hi'])
@@ -102,7 +104,17 @@ def prepareTest(file, useWaveforms=False):
         
         watch.append( cpu.status['q_C'])
         watch.append( cpu.status['q_V'])
+        watch.append( control._wires['fetch'])
+        watch.append( control._wires['act_finish_dispatch'])
+        watch.extend( py4hw.debug.getPorts(control.children['rom']))
+        watch.extend( py4hw.debug.getPorts(control.children['dispatch']))
         #watch.extend( py4hw.debug.getPorts(datapath.children['select_b']))
+        watch.extend( py4hw.debug.getPorts(control.children['seq']))
+        watch.append(py4hw.FieldInspector(control.children['retired'], 'v'))
+        
+        watch.append( cpu.status['q_IR'])
+        watch.append( cpu.control['e_IR'])
+        watch.append( cpu.control['sel_databus'])
         
         wvf = py4hw.Waveform(hw, 'wvf', watch)
 
@@ -114,20 +126,7 @@ def prepareTest(file, useWaveforms=False):
     return hw, cpu, mem, symbols
 
 
-# # --------------------------------------------------------------------------
-# # Running
-# # --------------------------------------------------------------------------
-# def step():
-#     """Clock the CPU until one instruction has been retired."""
-#     simulator = hw.getSimulator()
-#     retired = cpu.getRetiredInstructions()
-
-#     for _ in range(MAX_CLOCKS_PER_INSTRUCTION):
-#         simulator.clk(1)
-#         if cpu.getRetiredInstructions() != retired:
-#             return
-
-#     raise Exception('CPU did not retire an instruction')
+from tqdm import tqdm
 
 
 def runTest(file, verbose=False):
@@ -139,11 +138,13 @@ def runTest(file, verbose=False):
     # The CPU prints an instruction trace; hide it unless verbose
     with open(os.devnull, 'w') as null:
         with contextlib.redirect_stdout(sys.stdout if verbose else null):
-            while cpu.getRegister('PC') != symbols['end']:
-                step()
-                step_count += 1
-                if step_count > step_limit:
-                    raise Exception('Step count > limit')
+            with tqdm(total=step_limit, file=sys.stderr) as pbar:
+                while cpu.getRegister('PC') != symbols['end']:
+                    step()
+                    step_count += 1
+                    pbar.update(1)
+                    if step_count > step_limit:
+                        raise Exception('Step count > limit')
 
     test_case = mem.readByte(symbols['test_case'])
     final_result = mem.readByte(symbols['final_result'])
@@ -250,3 +251,4 @@ if __name__ == "__main__":
         if sys.argv[1] == '-c':
             eval(sys.argv[2])
             os._exit(0)
+
