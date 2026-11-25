@@ -44,11 +44,19 @@ class MicrocodedControlUnit6502(py4hw.Logic):
         address = self.wire('address', rom_add_w )
         oe = self.wire('oe')
         
+        # Dispatch indicates we are processing an instruction through the 
+        # sequencer. Fetch indicates we should jump to the vector defined by IR
+        # Dispatch
+        #   - is set to 1 when fetch is over (how to know ?)
+        #   - is reset to 0 when finish_dispatch if dispatch was active
+        
         fetch = self.wire('fetch')
         finish_dispatch = self.wire('finish_dispatch')
+        act_finish_dispatch = self.wire('act_finish_dispatch')
         set_dispatch= self.wire('set_dispatch')
         
-        py4hw.Or2(self, 'set_dispatch', fetch, finish_dispatch, set_dispatch)
+        py4hw.And(self, 'act_finish_dispatch', [dispatch , finish_dispatch, oe], act_finish_dispatch)
+        py4hw.Or2(self, 'set_dispatch', fetch, act_finish_dispatch, set_dispatch)
         py4hw.Not(self, 'fetch', dispatch, fetch)
         
         # We start by executing fetch 
@@ -75,10 +83,18 @@ class MicrocodedControlUnit6502(py4hw.Logic):
         
         mux_wires = []
         for key in list_status_keys:
-            negated_status = self.wire(f'n_{key}')
-            py4hw.Not(self, f'n_{key}', status[key], negated_status)
-            mux_wires.append(status[key])
-            mux_wires.append(negated_status)
+            status_signal = status[key]
+            # Check if the source of this signal is not sequential,
+            # if so, add a register. All conditions should be registered
+            if not(status_signal.source.parent.isClockable()):
+                registered_status = self.wire(f'reg_{key}')
+                py4hw.Reg(self, f'reg_{key}', status_signal, registered_status)
+                status_signal = registered_status
+                
+            negated_status_signal = self.wire(f'n_{key}')
+            py4hw.Not(self, f'n_{key}', status_signal, negated_status_signal)
+            mux_wires.append(status_signal)
+            mux_wires.append(negated_status_signal)
         
         # fill the rest with zero
         zero = self.wire('zero')
@@ -97,14 +113,12 @@ class MicrocodedControlUnit6502(py4hw.Logic):
         
         for key_c in control.keys():
             c = control[key_c]
-            enabled_c = self.wire(f'exe_{c.name}')
-            py4hw.And2(self, f'exe_{c.name}', enabled_c, oe, c)
+            enabled_c = self.wire(f'exe_{c.name}', c.getWidth())
+            py4hw.BufEnable(self, f'exe_{c.name}', enabled_c, oe, c)
             extended_control[key_c] = enabled_c
             
         
-        rom_control = self.wire('rom_control', len(extended_control.keys()))
-        py4hw.BitsLSBF(self, 'control', rom_control, list(extended_control.values()))
-
+        
         # @todo WE SHOULD AUTOMATICALLY BUILD THE ROM        
         # ANALYZING THE CODE OF THE ALGORITHMIC MODEL IMPLEMENTATION
         # TAKING INTO ACCOUNT THAT INSTEAD OF THE HUGE IF/ELSE STRUCTURE
@@ -117,6 +131,10 @@ class MicrocodedControlUnit6502(py4hw.Logic):
         for key in control_keys:
             control_widths[key] = extended_control[key].getWidth()
             nc += extended_control[key].getWidth()
+
+        rom_control = self.wire('rom_control', nc)
+        py4hw.RangesLSBF(self, 'control', rom_control, list(extended_control.values()), useWireNames=True)
+
 
         cond_index = {'q_B': 0, 'q_C':1, 'q_D':2, 'q_Z':3, 'q_N':4, 'q_I':5, 'q_V':6,
                       'alu_C':7, 'alu_V':8, 'alu_Z':9, 'alu_N':10 }
@@ -132,6 +150,7 @@ class MicrocodedControlUnit6502(py4hw.Logic):
         rom.analyzeClass(ControlUnit6502Algorithmic)
         fetch_addr = rom.address_of('fetchIR')      # 257 with the current layout
 
+        self.rom_compiler = rom
         print(*rom.warnings, sep='\n')
         contents, line_width = rom.contents(), rom.line_width   # feeds AsynchronousROM and the rom_line wire
         
@@ -140,7 +159,14 @@ class MicrocodedControlUnit6502(py4hw.Logic):
 
         MicrocodingROM(self, 'rom', rom_address, rom_line, contents, **rom.rom_metadata())
         
-        Sequencer(self, 'seq', reset, ins, cond, address, pc, oe, 3, reset_pc=fetch_addr)
+        auto_reset = self.wire('auto_reset')
+        seq_reset = self.wire('seq_reset')
+        
+        py4hw.AutoReset(self, 'auto_reset', auto_reset)
+        py4hw.Or2(self, 'seq_reset', reset, auto_reset, seq_reset)
+        
+        
+        Sequencer(self, 'seq', seq_reset, ins, cond, address, pc, oe, 3, reset_pc=fetch_addr)
         
         # ROM Line structure
         # instruction (3 bits) | condition (nsw bits) | address / control (nac bits)
@@ -149,7 +175,71 @@ class MicrocodedControlUnit6502(py4hw.Logic):
         py4hw.Range(self, 'cond', rom_line, nac+nsw-1, nac, sel_cond)
         py4hw.Range(self, 'ins', rom_line, nac+3+nsw-1, nac+nsw, ins)
 
+        RetiredInsCounter(self, 'retired', act_finish_dispatch)
+        InstructionTracer(self, 'tracer', act_finish_dispatch, status,
+                  self.parent.children['datapath'])
 
+class RetiredInsCounter(py4hw.Logic):
+    def __init__(self, parent, name, inc):
+        super().__init__(parent, name)
+        
+        self.inc = self.addIn('inc', inc)
+        self.v = 0
+        
+    def isSynthesizable(self):
+        return False
+    
+    def clock(self):
+        if (self.inc.get() == 1):
+            self.v += 1 
+
+class InstructionTracer(py4hw.Logic):
+    """Simulation-only. Prints one line per retired instruction."""
+
+    def __init__(self, parent, name, retire, status, datapath, read_byte=None):
+        super().__init__(parent, name)
+        self.addIn('retire', retire)
+        self.addIn('q_IR', status['q_IR'])
+        self.retire = retire
+        self.status = status
+        self.dp = datapath
+        self.read_byte = read_byte      # optional: callable(addr) -> byte
+        self.pending = False            # retire seen on the previous cycle
+        self.pc_start = None
+
+    def clock(self):
+        w = self.dp._wires
+
+        # Report one cycle AFTER retire so the last micro-op has latched
+        if self.pending:
+            self.pending = False
+            self.report()
+            self.pc_start = w['q_PC'].get()   # PC of the next instruction
+
+        if self.retire.get():
+            self.pending = True
+
+    def report(self):
+        w = self.dp._wires
+        st = self.status
+        op = st['q_IR'].get()
+        from punxa_6502 import ins_to_str
+        from punxa_6502 import OPERAND_SIZE_MAP
+        ins, addressing = ins_to_str(op)
+        nbytes = OPERAND_SIZE_MAP[addressing]
+
+        operands = ''
+        if self.read_byte is not None and self.pc_start is not None:
+            operands = ' '.join(f'{self.read_byte(self.pc_start + 1 + i):02X}'
+                                for i in range(nbytes))
+
+        pc = f'{self.pc_start:04X}' if self.pc_start is not None else '????'
+        print(f'{pc} - {op:02X} {operands:<6} {ins} {addressing:<10} '
+              f'A={w["q_A"].get():02X} X={w["q_X"].get():02X} '
+              f'Y={w["q_Y"].get():02X} SP={w["q_SP"].get():02X} '
+              f'N={st["q_N"].get()} V={st["q_V"].get()} D={st["q_D"].get()} '
+              f'I={st["q_I"].get()} Z={st["q_Z"].get()} C={st["q_C"].get()}')
+        
 class MicrocodingROM(py4hw.AsynchronousROM):
 
     def __init__(self, parent, name, address, data, contents,
