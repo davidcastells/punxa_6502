@@ -102,7 +102,7 @@ python tb_ISA_tests_Hybrid.py -c "runAllTests()"
 
 <pre>
 test_arith      100.0 %  |█████████████████████████████████████████████|
-test_bitmap     100.0 %  |█████████████████████████████████████████████|
+test_bitmap     25.0 %   |████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|
 test_ctrflow    100.0 %  |█████████████████████████████████████████████|
 test_data       100.0 %  |█████████████████████████████████████████████|
 test_logic      100.0 %  |█████████████████████████████████████████████|
@@ -123,10 +123,10 @@ Test test_arith_INC.asm             = OK
 Test test_arith_INX.asm             = OK
 Test test_arith_INY.asm             = OK
 Test test_arith_SBC.asm             = OK
-Test test_bitmap_ASL.asm            = OK
-Test test_bitmap_LSR.asm            = OK
+Test test_bitmap_ASL.asm            = FAILED - Failed in test case 10
+Test test_bitmap_LSR.asm            = FAILED - Failed in test case 13
 Test test_bitmap_ROL.asm            = OK
-Test test_bitmap_ROR.asm            = OK
+Test test_bitmap_ROR.asm            = FAILED - Failed in test case 13
 Test test_ctrflow_BCC.asm           = OK
 Test test_ctrflow_BCS.asm           = OK
 Test test_ctrflow_BEQ.asm           = OK
@@ -165,7 +165,7 @@ Test test_mcu_NOP.asm               = OK
 Test test_mcu_SEC.asm               = OK
 Test test_mcu_SED.asm               = OK
 Test test_mcu_SEI.asm               = OK
-Total: 53 Correct: 53 (100.0 %)
+Total: 53 Correct: 50 (94.3 %)
 ```
 
 ## Multi-cycle microcoded design

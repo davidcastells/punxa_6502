@@ -1,6 +1,6 @@
 # ISA test coverage
 
-Updated 2026-11-19. This covers the SingleCycle, Hybrid and Microcoded models.
+Updated 2026-11-24. This covers the SingleCycle, Hybrid and Microcoded models.
 For how to run the tests, see [README.md](README.md).
 
 ## Summary
@@ -9,9 +9,9 @@ For how to run the tests, see [README.md](README.md).
 | --- | --- |
 | Instructions in the decoder ([instruction_decode.py](../../punxa_6502/instruction_decode.py)) | 56 mnemonics, 151 opcode/mode pairs |
 | Instructions with a test file | **53 mnemonics, 148 pairs** |
-| Test cases | 468 |
+| Test cases | 486 |
 | SingleCycle full suite | **53/53 PASS** |
-| Hybrid full suite | **53/53 PASS** |
+| Hybrid full suite | **50/53 PASS** (ASL, LSR and ROR fail, see [known issues](#known-issues)) |
 | Microcoded full suite | Not run ([validation limitations](#validation-limitations)) |
 | Instructions without a test | 3 mnemonics, 3 pairs ([list below](#instructions-without-a-test)) |
 
@@ -26,9 +26,9 @@ opcodes that actually executed during a full run.
 - Flags are captured with `PHP` right after the target instruction, and the
   whole status byte is compared (N, V, D, I, Z, C, plus B and bit 5 as pushed
   by PHP).
-- Cases that check the stack (ROL cases 13-16, PLP cases 14-15) do not use
-  `PHP` after the target instruction, because PHP would overwrite the stack slot
-  being checked.
+- Cases that check the stack (ROL cases 13-16, PLP cases 14-15, ASL cases
+  10-15, LSR and ROR cases 13-18) do not use `PHP` after the target
+  instruction, because PHP would overwrite the stack slot being checked.
 - Most tests also check that registers and memory the instruction should not
   touch are unchanged (A, X, Y, SP, neighbouring bytes, guard bytes).
 - Decimal mode is never tested. Tests that do arithmetic clear D first.
@@ -67,9 +67,9 @@ Mode names: `#` immediate, `zp` zero page, `abs` absolute, `rel` relative,
 | Logic | ORA | [test_logic_ORA.asm](isa/test_logic_ORA.asm) | all 8 | 15 | A, N/Z, other state preserved; zero-page pointer wrap |
 | Logic | EOR | [test_logic_EOR.asm](isa/test_logic_EOR.asm) | all 8 | 15 | A, N/Z, other state preserved, operand not written; zp,X wrap, page crossing, pointer wrap |
 | Logic | BIT | [test_logic_BIT.asm](isa/test_logic_BIT.asm) | `zp`, `abs` | 10 | N/V from memory bits 7/6, Z from A AND M, each flag independently; A, C/D/I and memory unchanged |
-| Shift | ASL | [test_bitmap_ASL.asm](isa/test_bitmap_ASL.asm) | `A`, `zp`, `zp,X`, `abs`, `abs,X` | 9 | Result, C/N/Z, memory write-back |
-| Shift | LSR | [test_bitmap_LSR.asm](isa/test_bitmap_LSR.asm) | `A`, `zp`, `zp,X`, `abs`, `abs,X` | 12 | Result, C = old bit 0, N = 0, incoming C not shifted in; write-back, A kept, guards |
-| Shift | ROR | [test_bitmap_ROR.asm](isa/test_bitmap_ROR.asm) | `A`, `zp`, `zp,X`, `abs`, `abs,X` | 12 | Result, carry in and out, N/Z; write-back, A kept, guards |
+| Shift | ASL | [test_bitmap_ASL.asm](isa/test_bitmap_ASL.asm) | `A`, `zp`, `zp,X`, `abs`, `abs,X` | 15 | Result, C/N/Z, memory write-back; `abs` and `abs,X`: stack slot and SP unchanged, operand at `$0100+SP` |
+| Shift | LSR | [test_bitmap_LSR.asm](isa/test_bitmap_LSR.asm) | `A`, `zp`, `zp,X`, `abs`, `abs,X` | 18 | Result, C = old bit 0, N = 0, incoming C not shifted in; write-back, A kept, guards; `abs` and `abs,X`: stack slot and SP unchanged, operand at `$0100+SP` |
+| Shift | ROR | [test_bitmap_ROR.asm](isa/test_bitmap_ROR.asm) | `A`, `zp`, `zp,X`, `abs`, `abs,X` | 18 | Result, carry in and out, N/Z; write-back, A kept, guards; `abs` and `abs,X`: stack slot and SP unchanged, operand at `$0100+SP` |
 | Shift | ROL | [test_bitmap_ROL.asm](isa/test_bitmap_ROL.asm) | `A`, `zp`, `zp,X`, `abs`, `abs,X` | 16 | Result, carry in and out, N/Z, V unchanged; write-back, A kept; stack slot and SP unchanged |
 | Branch | BCC, BCS, BEQ, BMI, BNE, BVC, BVS | [BCC](isa/test_ctrflow_BCC.asm), [BCS](isa/test_ctrflow_BCS.asm), [BEQ](isa/test_ctrflow_BEQ.asm), [BMI](isa/test_ctrflow_BMI.asm), [BNE](isa/test_ctrflow_BNE.asm), [BVC](isa/test_ctrflow_BVC.asm), [BVS](isa/test_ctrflow_BVS.asm) | `rel` | 8, 8, 6, 8, 8, 8, 8 | Taken and not taken, forward and backward, page crossing, +127/-128, flags unchanged |
 | Jump | JMP | [test_ctrflow_JMP.asm](isa/test_ctrflow_JMP.asm) | `abs`, `(abs)` | 7 | Target address; `($xxFF)` reads its high byte from `$xx00` (NMOS behaviour) |
@@ -107,13 +107,13 @@ These behaviours are not tested by any file:
 
 ## Known issues
 
-These are problems in how instructions behave. None of them make a test fail.
+These are problems in how instructions behave. Only the Hybrid issue makes tests fail.
 
 | Area | Issue | Location |
 | --- | --- | --- |
 | SingleCycle | `abs,X` and `abs,Y` do not wrap at 16 bits, so `$FFFF,X` gives an address above 64 KiB. | [singlecycle_processor.py](../../punxa_6502/algorithmic/singlecycle_processor.py), lines 179 and 186 |
 | SingleCycle | Taken branches do not wrap the PC at `$FFFF`. | same file, lines 296-343 |
-| Hybrid and Microcoded | ASL, LSR and ROR in `abs` and `abs,X` save A at `$0100+SP` (`pushA`/`popA`), so they overwrite the free stack slot. The tests do not detect it, because the `PHP` flag capture writes the same slot afterwards. | [control_unit.py](../../punxa_6502/algorithmic/control_unit.py), `executeASL_ABS`, `executeLSR_ABS`, `executeROR_ABS` and their `abs,X` versions |
+| Hybrid and Microcoded | ASL, LSR and ROR in `abs` and `abs,X` save A at `$0100+SP` (`pushA`/`popA`), so they overwrite the free stack slot. If the operand is at `$0100+SP`, the push overwrites it before it is read, so the instruction works on A's value instead: the stored result and A are wrong, and the flags can be wrong too. The ASL, LSR and ROR tests detect it and fail on Hybrid. The Microcoded model is generated from the same control unit but is not run (see [validation limitations](#validation-limitations)). Earlier versions of these tests missed it because the `PHP` flag capture wrote to the same stack slot afterwards. | [control_unit.py](../../punxa_6502/algorithmic/control_unit.py), `executeASL_ABS`, `executeLSR_ABS`, `executeROR_ABS` and their `abs,X` versions |
 
 ## Validation limitations
 
@@ -140,8 +140,8 @@ file was written before the control unit moved to `algorithmic/control_unit.py`.
 ## History
 
 The suite was built in stages (Phase A and Batches 1-6, then the instructions
-added on 2026-11-10 and 2026-11-11, and BCS, BMI, BIT, ROL, PLP and NOP added
-on 2026-11-19). The batch notes are kept in
+added on 2026-11-10 and 2026-11-11, BCS, BMI, BIT, ROL, PLP and NOP added
+on 2026-11-19, and the ASL, LSR and ROR stack cases added on 2026-11-24). The batch notes are kept in
 [BATCH6_SUMMARY.md](BATCH6_SUMMARY.md) and [LDA_REVIEW.md](LDA_REVIEW.md).
 The pass/fail numbers in those notes are historical. Many failures recorded
 there were fixed later, and the current results above replace them. Earlier
