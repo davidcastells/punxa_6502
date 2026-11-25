@@ -132,9 +132,18 @@ class DataPathStructural(py4hw.Logic):
                       control['alu_sel_SP'], 
                       control['alu_sel_MBR'],
                       control['alu_sel_P']],
-                     [q_PC_lo, q_PC_hi, q_MAR_lo, q_MAR_hi, q_A, q_X, q_Y, q_SP, q_MBR, q_P], b)
+                     [q_PC_lo, q_PC_hi, q_MAR_lo, q_MAR_hi, q_A, q_X, q_Y, q_SP, q_MBR, q_P], b, useWireNames=True)
         
-        ALUStructural(self, 'alu', q_A, b, q_alu, status['q_C'], control['alu_op'], status['alu_C'], status['alu_V'])
+        
+        pre_alu_C = status['alu_C']
+        pre_alu_V = status['alu_V']
+        
+        #pre_alu_C = self.wire('pre_alu_C')
+        #pre_alu_V = self.wire('pre_alu_V')
+        #py4hw.Reg(self, 'pre_alu_C', pre_alu_C, status['alu_C'])
+        #py4hw.Reg(self, 'pre_alu_V', pre_alu_V, status['alu_V'])
+        
+        ALUStructural(self, 'alu', q_A, b, q_alu, status['q_C'], control['alu_op'], pre_alu_C, pre_alu_V)
         
         # direct flags
         py4hw.Bit(self, 'alu_N', q_alu, 7, status['alu_N'])
@@ -147,8 +156,8 @@ class DataPathStructural(py4hw.Logic):
         
         c_pre_next = self.wire('c_pre_next')
         v_pre_next = self.wire('v_pre_next')
-        py4hw.Mux2(self, 'c_pre_next', sel=control['sel_C'], sel0=status['alu_C'], sel1=control['d_C'], r=c_pre_next)
-        py4hw.Mux2(self, 'v_pre_next', sel=control['sel_V'], sel0=status['alu_V'], sel1=control['d_V'], r=v_pre_next)
+        py4hw.Mux2(self, 'c_pre_next', sel=control['sel_C'], sel0=pre_alu_C, sel1=control['d_C'], r=c_pre_next)
+        py4hw.Mux2(self, 'v_pre_next', sel=control['sel_V'], sel0=pre_alu_V, sel1=control['d_V'], r=v_pre_next)
 
         c_next = self.wire('c_next')
         z_next = self.wire('z_next')
@@ -181,8 +190,10 @@ class DataPathStructural(py4hw.Logic):
         # PHP always pushes bits 4 (B) and 5 as 1
         one1 = self.wire('one1')
         py4hw.Constant(self, 'one1', 1, one1)
+        kB = self.wire('kB')
+        py4hw.Constant(self, 'kB', 1, kB) # @todo we avoid reusing one1 to workaround a bug in py4hw schematic
         
-        py4hw.ConcatenateMSBF(self, 'P', [status['q_N'], status['q_V'], one1, one1, status['q_D'], status['q_I'], status['q_Z'], status['q_C']   ], q_P)
+        py4hw.ConcatenateMSBF(self, 'P', [status['q_N'], status['q_V'], one1, kB, status['q_D'], status['q_I'], status['q_Z'], status['q_C']   ], q_P)
 
         zero8 = self.wire('zero8', 8)
         one8 = self.wire('one8', 8)
