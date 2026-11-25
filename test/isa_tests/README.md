@@ -182,6 +182,73 @@ for this model. This is a limitation of the test setup, not a test result (see
 python tb_ISA_tests_Multicycle.py -c "runAllTests()"
 ```
 
+<pre>
+test_arith      100.0 %  |█████████████████████████████████████████████|
+test_bitmap     0.0 %    |░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|
+test_ctrflow    100.0 %  |█████████████████████████████████████████████|
+test_data       93.8 %   |███████████████████████████████████████████░░|
+test_logic      100.0 %  |█████████████████████████████████████████████|
+</pre>
+
+The detailed current output is:
+
+```
+Test test_arith_ADC.asm             = OK
+Test test_arith_CMP.asm             = OK
+Test test_arith_CPX.asm             = OK
+Test test_arith_CPY.asm             = OK
+Test test_arith_DEC.asm             = OK
+Test test_arith_DEX.asm             = OK
+Test test_arith_DEY.asm             = OK
+Test test_arith_INC.asm             = OK
+Test test_arith_INX.asm             = OK
+Test test_arith_INY.asm             = OK
+Test test_arith_SBC.asm             = OK
+Test test_bitmap_ASL.asm            = FAILED - Failed in test case 10
+Test test_bitmap_LSR.asm            = FAILED - Step count > limit
+Test test_bitmap_ROL.asm            = FAILED - Step count > limit
+Test test_bitmap_ROR.asm            = FAILED - Step count > limit
+Test test_ctrflow_BCC.asm           = OK
+Test test_ctrflow_BCS.asm           = OK
+Test test_ctrflow_BEQ.asm           = OK
+Test test_ctrflow_BMI.asm           = OK
+Test test_ctrflow_BNE.asm           = OK
+Test test_ctrflow_BVC.asm           = OK
+Test test_ctrflow_BVS.asm           = OK
+Test test_ctrflow_JMP.asm           = OK
+Test test_ctrflow_JSR.asm           = OK
+Test test_ctrflow_RTS.asm           = OK
+Test test_data_LDA.asm              = OK
+Test test_data_LDX.asm              = OK
+Test test_data_LDY.asm              = OK
+Test test_data_PHA.asm              = OK
+Test test_data_PHP.asm              = OK
+Test test_data_PLA.asm              = OK
+Test test_data_PLP.asm              = FAILED - Failed in test case 1
+Test test_data_STA.asm              = OK
+Test test_data_STX.asm              = OK
+Test test_data_STY.asm              = OK
+Test test_data_TAX.asm              = OK
+Test test_data_TAY.asm              = OK
+Test test_data_TSX.asm              = OK
+Test test_data_TXA.asm              = OK
+Test test_data_TXS.asm              = OK
+Test test_data_TYA.asm              = OK
+Test test_logic_AND.asm             = OK
+Test test_logic_BIT.asm             = OK
+Test test_logic_EOR.asm             = OK
+Test test_logic_ORA.asm             = OK
+Test test_mcu_CLC.asm               = OK
+Test test_mcu_CLD.asm               = OK
+Test test_mcu_CLI.asm               = OK
+Test test_mcu_CLV.asm               = OK
+Test test_mcu_NOP.asm               = OK
+Test test_mcu_SEC.asm               = OK
+Test test_mcu_SED.asm               = OK
+Test test_mcu_SEI.asm               = OK
+Total: 53 Correct: 48 (90.6 %)
+```
+
 ## More information
 
 - [COVERAGE.md](COVERAGE.md): what each test checks, untested instructions and known issues.
