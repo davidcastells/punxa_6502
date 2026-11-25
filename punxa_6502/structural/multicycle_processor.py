@@ -11,10 +11,6 @@ from punxa_6502.structural.datapath import DataPathStructural
 from .microcoding import MicrocodedControlUnit6502
    
         
-
-
-        
-        
 class MultiCycle6502(py4hw.Logic):
     
     def __init__(self, parent, name:str, memory:punxa_6502.MemoryInterface, 
@@ -51,7 +47,7 @@ class MultiCycle6502(py4hw.Logic):
              self.inv_symbols[val] = key
              
     def getRetiredInstructions(self):
-        return self.children['control'].getRetiredInstructions()
+        return self.children['control'].children['retired'].v
         
     def getRegister(self, r):
         r = r.upper()
