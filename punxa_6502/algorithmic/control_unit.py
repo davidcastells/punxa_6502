@@ -1150,7 +1150,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
 
         yield from self.incPC()
         d = self.status['q_D'].get()
-        print(f'\t\t\tCLD \t\t--> (D={d})')
+        print(f'\t\tCLD \t\t--> (D={d})')
 
     def executeCLI(self):
         control = self.control
@@ -1898,7 +1898,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield from self.pushA()                # save A on the stack (MAR still holds the address)
         yield from self.fetchMAR_MBR()         # M = mem[MAR] -> MBR
         yield from self.transferMBR_to_A()     # A = M
-        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.unsetC()               # shift a 0 into bit 7
         yield from self.aluROR_A()             # A = {0, M[7:1]}, C = old M[0], N = 0, update Z
         r = self.parent.children['datapath']._wires['q_A'].get()
         yield from self.storeA()               # mem[MAR] = A
@@ -1920,7 +1920,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield from self.pushA()                # save A on the stack (MAR still holds the address)
         yield from self.fetchMAR_MBR()         # M = mem[MAR] -> MBR
         yield from self.transferMBR_to_A()     # A = M
-        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.unsetC()                # shift a 0 into bit 7
         yield from self.aluROR_A()             # A = {0, M[7:1]}, C = old M[0], N = 0, update Z
         r = self.parent.children['datapath']._wires['q_A'].get()
         yield from self.storeA()               # mem[MAR] = A
@@ -1932,7 +1932,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         print(f'\tLSR ${b:02X}{a:02X},X \t--> M={r:02X} C={c} N={n} Z={z}')
 
     def executeLSR_ACC(self):
-        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.unsetC()                # shift a 0 into bit 7
         yield from self.aluROR_A()             # A = {0, A[7:1]}, C = old A[0], N = 0, update Z
         yield from self.incPC()
         a = self.parent.children['datapath']._wires['q_A'].get()
@@ -1947,7 +1947,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         m = self.parent.children['datapath']._wires['q_MAR_lo'].get()
         yield from self.transferA_to_MAR_hi()  # park A (MAR_hi is unused in zero page)
         yield from self.fetchZP_A()            # A = M
-        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.unsetC()                # shift a 0 into bit 7
         yield from self.aluROR_A()             # A = {0, M[7:1]}, C = old M[0], N = 0, update Z
         r = self.parent.children['datapath']._wires['q_A'].get()
         yield from self.storeA_ZP()            # mem[0x00:MAR_lo] = A
@@ -1965,7 +1965,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield from self.addX_to_MAR()          # MAR_lo = (base + X) & 0xFF, A is preserved
         yield from self.transferA_to_MAR_hi()  # park A (MAR_hi is unused in zero page)
         yield from self.fetchZP_A()            # A = M
-        yield from self.setC(0)                # shift a 0 into bit 7
+        yield from self.unsetC()                # shift a 0 into bit 7
         yield from self.aluROR_A()             # A = {0, M[7:1]}, C = old M[0], N = 0, update Z
         r = self.parent.children['datapath']._wires['q_A'].get()
         yield from self.storeA_ZP()            # mem[0x00:MAR_lo] = A
@@ -2145,7 +2145,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield from self.pushP()
         yield from self.incPC()
         p = self.parent.children['datapath']._wires['q_P'].get()
-        print(f'\t\t\tPHP\t\t--> P={p:02X}')
+        print(f'\t\tPHP\t\t--> P={p:02X}')
         
     def executePLA(self):
         yield from self.popA()
@@ -2154,7 +2154,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         a = self.parent.children['datapath']._wires['q_A'].get()
         z = self.status['q_Z'].get()
         n = self.status['q_N'].get()
-        print(f'\t\t\tPLA\t\t--> A={a:02X} N={n} Z={z}')
+        print(f'\t\tPLA\t\t--> A={a:02X} N={n} Z={z}')
 
     def executeROR_ABS(self):
         yield from self.incPC()
@@ -2607,7 +2607,7 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield from self.incPC()
         yield from self.transferX_to_S()
         s = self.parent.children['datapath']._wires['q_SP'].get()
-        print(f'\t\t\tTXS\t\t--> SP={s:02X}')
+        print(f'\t\tTXS\t\t--> SP={s:02X}')
         
     def executeTYA(self):
         yield from self.incPC()
@@ -2964,9 +2964,20 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield
     
         
-    def setC(self, value):
+    def setC(self):
         control = self.control
-        control['d_C'].prepare(value)
+        control['d_C'].prepare(1)
+        control['sel_C'].prepare(1)      # take the value from the CU, not the ALU
+        control['e_C'].prepare(1)
+        yield
+        control['d_C'].prepare(0)
+        control['sel_C'].prepare(0)      # back to the ALU carry
+        control['e_C'].prepare(0)
+        yield
+    
+    def unsetC(self, value):
+        control = self.control
+        control['d_C'].prepare(0)
         control['sel_C'].prepare(1)      # take the value from the CU, not the ALU
         control['e_C'].prepare(1)
         yield
@@ -3408,10 +3419,8 @@ class ControlUnit6502Algorithmic(py4hw.Logic):
         yield from self.decSP()
 
     def decodeAndExecute(self):
-        control = self.control
         op = self.status['q_IR'].get()
-        decoded_ins, decoded_addressing = punxa_6502.ins_to_str(op)
-        toread = punxa_6502.OPERAND_SIZE_MAP[decoded_addressing]
+            
         
         #print(f'INS={op:02X} decoded:', decoded_ins, decoded_addressing, 'should read', toread, 'bytes')
         
