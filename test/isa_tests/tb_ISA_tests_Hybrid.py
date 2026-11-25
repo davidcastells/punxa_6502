@@ -95,7 +95,13 @@ def prepareTest(file, useWaveforms=False):
         watch = py4hw.debug.getInterfaceWires(cpu_port)
         datapath = cpu.children['datapath']
         watch.extend( py4hw.debug.getPorts(datapath.children['alu']))
+        watch.append( cpu.status['alu_C'])
+        watch.append( datapath._wires['databus'])
+        watch.append( cpu.control['e_PC_lo'])
         watch.append( datapath._wires['q_PC_lo'])
+        
+        
+        watch.append( cpu.control['e_PC_hi'])
         watch.append( datapath._wires['q_PC_hi'])
         watch.append( datapath._wires['q_PC'])
         watch.append( datapath._wires['q_SP'])
